@@ -1,0 +1,42 @@
+{
+  "name": "FocusOura",
+  "short_name": "FocusOura",
+  "description": "Grow your focus, one seed at a time. A gamified study app with virtual plants, challenges, and AI insights.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f0e8",
+  "theme_color": "#2D6A4F",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/onboarding.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "FocusOura Onboarding"
+    }
+  ],
+  "categories": ["education", "productivity", "lifestyle"],
+  "lang": "en",
+  "dir": "ltr"
+}

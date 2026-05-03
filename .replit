@@ -1,0 +1,58 @@
+modules = ["nodejs-24", "postgresql-16"]
+
+[[artifacts]]
+id = "artifacts/api-server"
+
+[[artifacts]]
+id = "artifacts/mockup-sandbox"
+
+[deployment]
+router = "application"
+deploymentTarget = "autoscale"
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=8080 pnpm --filter @workspace/api-server run dev & PORT=22333 BASE_PATH=/ pnpm --filter @workspace/web run dev"
+waitForPort = 22333
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+VITE_FIREBASE_PROJECT_ID = "focusoura-99dae"
+VITE_FIREBASE_AUTH_DOMAIN = "focusoura-99dae.firebaseapp.com"
+GOOGLE_API_KEY = "AIzaSyBF7OY1006fDvehA3GSpH2v4meYsOFqc-s"
+FIREBASE_PROJECT_ID = "focusoura-99dae"

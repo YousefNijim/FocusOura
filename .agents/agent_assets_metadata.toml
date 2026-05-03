@@ -1,0 +1,50 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "0brPrdrG65W3uvtO9cnjE"
+uri = "file://artifacts/web/src/assets/garden/plant-rose.png"
+type = "image"
+title = "Rose 🌹"
+
+[[outputs]]
+id = "LlYm9R-55a6P_7_hw5eF-"
+uri = "file://artifacts/web/src/assets/garden/plant-bonsai.png"
+type = "image"
+title = "Bonsai 🌳"
+
+[[outputs]]
+id = "hDKA38S5mj4oFv4R5_BZW"
+uri = "file://artifacts/web/src/assets/garden/plant-orchid.png"
+type = "image"
+title = "Orchid 🌸"
+
+[[outputs]]
+id = "mwLhPHaNW3c6b2UVbtPUT"
+uri = "file://artifacts/web/src/assets/garden/plant-cactus.png"
+type = "image"
+title = "Cactus 🌵"
+
+[[outputs]]
+id = "q2dtzItnZ-nrW1kFBBMnL"
+uri = "file://artifacts/web/src/assets/garden/plant-bamboo.png"
+type = "image"
+title = "Bamboo 🎋"
+
+[[outputs]]
+id = "SRi15sdKZ5OWwMdMuHLwN"
+uri = "file://artifacts/web/src/assets/garden/plant-fern.png"
+type = "image"
+title = "Fern 🌿"
+
+[[outputs]]
+id = "DUYSKT7iTH957dOdwlHo7"
+uri = "file://artifacts/web/src/assets/garden/plant-succulent.png"
+type = "image"
+title = "Succulent 🪴"
+
+[[outputs]]
+id = "HamCFFlk4MMFxvPUob9x2"
+uri = "file://artifacts/web/src/assets/garden/plant-lavender.png"
+type = "image"
+title = "Lavender 💜"

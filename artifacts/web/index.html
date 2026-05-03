@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!-- ── Viewport ─────────────────────────────────────────────── -->
+    <!-- user-scalable=yes is required for iOS accessibility compliance -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- ── App Identity ──────────────────────────────────────────── -->
+    <title>FocusOura — Grow Your Focus</title>
+    <meta name="description" content="A gamified study app. Grow virtual plants, challenge friends, and earn rewards by staying focused." />
+
+    <!-- ── PWA / Installability ───────────────────────────────────── -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#2D6A4F" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- ── iOS Specific ──────────────────────────────────────────── -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="FocusOura" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- ── Favicon ───────────────────────────────────────────────── -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- ── Open Graph ────────────────────────────────────────────── -->
+    <meta property="og:title" content="FocusOura — Grow Your Focus" />
+    <meta property="og:description" content="Stay focused. Grow your garden. Challenge friends." />
+    <meta property="og:image" content="/opengraph.jpg" />
+    <meta property="og:type" content="website" />
+
+    <!-- ── Fonts ─────────────────────────────────────────────────── -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+
+    <!-- ── Dark mode flash prevention ─────────────────────────────── -->
+    <script>
+      try {
+        var cached = localStorage.getItem("focusoura_user_cache");
+        if (cached) {
+          var u = JSON.parse(cached);
+          if (u && u.studyMode === "night") {
+            document.documentElement.classList.add("dark");
+            // Also update theme-color for dark mode
+            var tm = document.querySelector('meta[name="theme-color"]');
+            if (tm) tm.setAttribute("content", "#0f1c0e");
+          }
+        }
+      } catch(e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

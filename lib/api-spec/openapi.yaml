@@ -1,0 +1,735 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: FocusOura API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: users
+    description: User operations
+  - name: subjects
+    description: Subject management
+  - name: plants
+    description: Plant management
+  - name: sessions
+    description: Focus session management
+  - name: wallet
+    description: Wallet and transactions
+  - name: messages
+    description: Anonymous motivation messages
+  - name: insights
+    description: AI insights
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current user
+      responses:
+        "200":
+          description: User data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      operationId: updateMe
+      tags: [users]
+      summary: Update current user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /subjects:
+    get:
+      operationId: getSubjects
+      tags: [subjects]
+      summary: Get user subjects
+      responses:
+        "200":
+          description: List of subjects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Subject"
+    post:
+      operationId: createSubject
+      tags: [subjects]
+      summary: Create a new subject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubjectBody"
+      responses:
+        "201":
+          description: Created subject
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subject"
+
+  /subjects/{subjectId}:
+    put:
+      operationId: updateSubject
+      tags: [subjects]
+      summary: Update a subject
+      parameters:
+        - name: subjectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSubjectBody"
+      responses:
+        "200":
+          description: Updated subject
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subject"
+    delete:
+      operationId: deleteSubject
+      tags: [subjects]
+      summary: Delete a subject
+      parameters:
+        - name: subjectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /plants:
+    get:
+      operationId: getPlants
+      tags: [plants]
+      summary: Get user plants
+      responses:
+        "200":
+          description: List of plants
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Plant"
+
+  /plants/{plantId}:
+    put:
+      operationId: updatePlant
+      tags: [plants]
+      summary: Update plant growth
+      parameters:
+        - name: plantId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePlantBody"
+      responses:
+        "200":
+          description: Updated plant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Plant"
+
+  /sessions:
+    get:
+      operationId: getSessions
+      tags: [sessions]
+      summary: Get user sessions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Start a new focus session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionBody"
+      responses:
+        "201":
+          description: Created session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /sessions/active:
+    get:
+      operationId: getActiveSession
+      tags: [sessions]
+      summary: Get currently active session
+      responses:
+        "200":
+          description: Active session or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveSessionResponse"
+
+  /sessions/{sessionId}:
+    put:
+      operationId: updateSession
+      tags: [sessions]
+      summary: Update session state (complete or abort)
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSessionBody"
+      responses:
+        "200":
+          description: Updated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /sessions/{sessionId}/events:
+    post:
+      operationId: createSessionEvent
+      tags: [sessions]
+      summary: Record a session event
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionEventBody"
+      responses:
+        "201":
+          description: Created event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionEvent"
+
+  /wallet:
+    get:
+      operationId: getWallet
+      tags: [wallet]
+      summary: Get user wallet balance
+      responses:
+        "200":
+          description: Wallet info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+
+  /transactions:
+    get:
+      operationId: getTransactions
+      tags: [wallet]
+      summary: Get user transactions
+      responses:
+        "200":
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+  /messages/random:
+    get:
+      operationId: getRandomMessage
+      tags: [messages]
+      summary: Get a random anonymous motivational message
+      responses:
+        "200":
+          description: Random message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /messages:
+    post:
+      operationId: createMessage
+      tags: [messages]
+      summary: Submit a motivational message after completing a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMessageBody"
+      responses:
+        "201":
+          description: Created message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /insights/{sessionId}:
+    get:
+      operationId: getSessionInsights
+      tags: [insights]
+      summary: Get AI insights for a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: AI insights
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Insight"
+    post:
+      operationId: generateSessionInsights
+      tags: [insights]
+      summary: Generate AI insights for a completed session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Generated insights
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Insight"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [users]
+      summary: Get user focus statistics
+      responses:
+        "200":
+          description: User stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        email:
+          type: string
+        studyMode:
+          type: string
+          enum: [light, night]
+        notificationsEnabled:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - displayName
+        - email
+        - studyMode
+        - notificationsEnabled
+        - createdAt
+
+    UpdateUserBody:
+      type: object
+      properties:
+        displayName:
+          type: string
+        studyMode:
+          type: string
+          enum: [light, night]
+        notificationsEnabled:
+          type: boolean
+
+    Subject:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        accentColor:
+          type: string
+        plantId:
+          type: string
+        totalFocusMinutes:
+          type: integer
+        sessionCount:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - accentColor
+        - totalFocusMinutes
+        - sessionCount
+        - createdAt
+
+    CreateSubjectBody:
+      type: object
+      properties:
+        name:
+          type: string
+        accentColor:
+          type: string
+        plantType:
+          type: string
+      required:
+        - name
+        - accentColor
+
+    UpdateSubjectBody:
+      type: object
+      properties:
+        name:
+          type: string
+        accentColor:
+          type: string
+
+    Plant:
+      type: object
+      properties:
+        id:
+          type: string
+        subjectId:
+          type: string
+        subjectName:
+          type: string
+        plantType:
+          type: string
+        growthLevel:
+          type: integer
+        growthPoints:
+          type: integer
+        maxGrowthPoints:
+          type: integer
+        accentColor:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - subjectId
+        - subjectName
+        - plantType
+        - growthLevel
+        - growthPoints
+        - maxGrowthPoints
+        - accentColor
+        - createdAt
+
+    UpdatePlantBody:
+      type: object
+      properties:
+        growthPoints:
+          type: integer
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        subjectId:
+          type: string
+        subjectName:
+          type: string
+        sessionType:
+          type: string
+          enum: [routine, homework, deep_focus]
+        state:
+          type: string
+          enum: [initialized, started, warning, completed, aborted]
+        startTime:
+          type: string
+        endTime:
+          type: string
+        durationMinutes:
+          type: integer
+        pointsEarned:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - subjectId
+        - subjectName
+        - sessionType
+        - state
+        - startTime
+        - durationMinutes
+        - pointsEarned
+        - createdAt
+
+    ActiveSessionResponse:
+      type: object
+      properties:
+        session:
+          $ref: "#/components/schemas/Session"
+
+    CreateSessionBody:
+      type: object
+      properties:
+        subjectId:
+          type: string
+        sessionType:
+          type: string
+          enum: [routine, homework, deep_focus]
+        durationMinutes:
+          type: integer
+      required:
+        - subjectId
+        - sessionType
+        - durationMinutes
+
+    UpdateSessionBody:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [completed, aborted]
+        endTime:
+          type: string
+      required:
+        - state
+
+    SessionEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        eventType:
+          type: string
+          enum: [started, warning, violation, completed, aborted]
+        eventTime:
+          type: string
+        metadata:
+          type: object
+      required:
+        - id
+        - sessionId
+        - eventType
+        - eventTime
+
+    CreateSessionEventBody:
+      type: object
+      properties:
+        eventType:
+          type: string
+          enum: [started, warning, violation, completed, aborted]
+        metadata:
+          type: object
+      required:
+        - eventType
+
+    Wallet:
+      type: object
+      properties:
+        balance:
+          type: integer
+        lastUpdated:
+          type: string
+      required:
+        - balance
+        - lastUpdated
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [reward, purchase, bet]
+        amount:
+          type: integer
+        description:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - type
+        - amount
+        - description
+        - createdAt
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - content
+        - createdAt
+
+    CreateMessageBody:
+      type: object
+      properties:
+        content:
+          type: string
+        sessionId:
+          type: string
+      required:
+        - content
+
+    Insight:
+      type: object
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        type:
+          type: string
+          enum: [motivation, warning, achievement]
+        content:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - sessionId
+        - type
+        - content
+        - createdAt
+
+    UserStats:
+      type: object
+      properties:
+        totalFocusMinutes:
+          type: integer
+        totalSessions:
+          type: integer
+        completedSessions:
+          type: integer
+        currentStreak:
+          type: integer
+        longestStreak:
+          type: integer
+        todayMinutes:
+          type: integer
+        weekMinutes:
+          type: integer
+      required:
+        - totalFocusMinutes
+        - totalSessions
+        - completedSessions
+        - currentStreak
+        - longestStreak
+        - todayMinutes
+        - weekMinutes

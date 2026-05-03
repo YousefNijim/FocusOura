@@ -1,0 +1,41 @@
+import { Router, type IRouter } from "express";
+import healthRouter from "./health.js";
+import authRouter from "./auth.js";
+import configRouter from "./config.js";
+import usersRouter from "./users.js";
+import subjectsRouter from "./subjects.js";
+import plantsRouter from "./plants.js";
+import sessionsRouter from "./sessions.js";
+import walletRouter from "./wallet.js";
+import messagesRouter from "./messages.js";
+import insightsRouter from "./insights.js";
+import friendsRouter from "./friends.js";
+import challengesRouter from "./challenges.js";
+import petsRouter from "./pets.js";
+import analyticsRouter from "./analytics.js";
+import storeRouter from "./store.js";
+import adminRouter from "./admin.js";
+import { authMiddleware } from "../middleware/auth.js";
+
+const router: IRouter = Router();
+
+router.use(healthRouter);
+router.use("/auth", authRouter);
+router.use("/config", configRouter);
+router.use("/users", authMiddleware, usersRouter);
+router.use("/stats", authMiddleware, usersRouter);
+router.use("/subjects", authMiddleware, subjectsRouter);
+router.use("/plants", authMiddleware, plantsRouter);
+router.use("/sessions", authMiddleware, sessionsRouter);
+router.use("/wallet", authMiddleware, walletRouter);
+router.use("/transactions", authMiddleware, walletRouter);
+router.use("/messages", authMiddleware, messagesRouter);
+router.use("/insights", authMiddleware, insightsRouter);
+router.use("/friends", authMiddleware, friendsRouter);
+router.use("/challenges", authMiddleware, challengesRouter);
+router.use("/pets", authMiddleware, petsRouter);
+router.use("/analytics", authMiddleware, analyticsRouter);
+router.use("/store", authMiddleware, storeRouter);
+router.use("/admin", authMiddleware, adminRouter);
+
+export default router;

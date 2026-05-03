@@ -1,0 +1,207 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Serif+Display&display=swap');
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-coin: hsl(var(--coin));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+  --font-sans: var(--app-font-sans);
+  --font-serif: var(--app-font-serif);
+  --font-mono: var(--app-font-mono);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: 39 33% 96%;
+  --foreground: 150 20% 15%;
+  --card: 39 30% 93%;
+  --card-foreground: 150 20% 15%;
+  --popover: 39 33% 96%;
+  --popover-foreground: 150 20% 15%;
+  --primary: 152 45% 28%;
+  --primary-foreground: 39 33% 96%;
+  --secondary: 39 25% 88%;
+  --secondary-foreground: 150 20% 20%;
+  --muted: 39 20% 90%;
+  --muted-foreground: 150 10% 45%;
+  --accent: 36 60% 55%;
+  --accent-foreground: 39 33% 96%;
+  --destructive: 0 65% 55%;
+  --destructive-foreground: 39 33% 96%;
+  --border: 39 20% 85%;
+  --input: 39 20% 85%;
+  --ring: 152 45% 28%;
+  --radius: 1rem;
+  --success: 152 50% 40%;
+  --success-foreground: 39 33% 96%;
+  --warning: 36 80% 50%;
+  --warning-foreground: 39 33% 96%;
+  --coin: 45 90% 55%;
+  --sidebar: 39 30% 93%;
+  --sidebar-foreground: 150 20% 15%;
+  --sidebar-primary: 152 45% 28%;
+  --sidebar-primary-foreground: 39 33% 96%;
+  --sidebar-accent: 39 25% 88%;
+  --sidebar-accent-foreground: 150 20% 20%;
+  --sidebar-border: 39 20% 85%;
+  --sidebar-ring: 152 45% 28%;
+  --app-font-sans: 'DM Sans', system-ui, sans-serif;
+  --app-font-serif: 'DM Serif Display', Georgia, serif;
+  --app-font-mono: Menlo, monospace;
+}
+
+.dark {
+  --background: 150 15% 8%;
+  --foreground: 39 25% 90%;
+  --card: 150 15% 12%;
+  --card-foreground: 39 25% 90%;
+  --popover: 150 15% 10%;
+  --popover-foreground: 39 25% 90%;
+  --primary: 152 45% 40%;
+  --primary-foreground: 150 15% 8%;
+  --secondary: 150 12% 18%;
+  --secondary-foreground: 39 25% 85%;
+  --muted: 150 10% 16%;
+  --muted-foreground: 39 15% 55%;
+  --accent: 36 60% 50%;
+  --accent-foreground: 150 15% 8%;
+  --destructive: 0 65% 55%;
+  --destructive-foreground: 39 25% 90%;
+  --border: 150 10% 20%;
+  --input: 150 10% 20%;
+  --ring: 152 45% 40%;
+  --success: 152 50% 40%;
+  --coin: 45 90% 55%;
+  --sidebar: 150 15% 12%;
+  --sidebar-foreground: 39 25% 90%;
+  --sidebar-border: 150 10% 20%;
+  --sidebar-primary: 152 45% 40%;
+  --sidebar-primary-foreground: 150 15% 8%;
+  --sidebar-accent: 150 12% 18%;
+  --sidebar-accent-foreground: 39 25% 85%;
+  --sidebar-ring: 152 45% 40%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+    /* Remove default tap highlight on mobile */
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    /* Prevent overscroll bounce on iOS */
+    overscroll-behavior: none;
+  }
+  button, a, [role="button"] {
+    /* Prevent double-tap zoom on interactive elements */
+    touch-action: manipulation;
+  }
+}
+
+/* ── iOS Safe Area Support ──────────────────────────────────────────────── */
+/* Bottom nav respects home indicator on iPhone X+ */
+nav.fixed.bottom-0 {
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+}
+/* Main content safe area for status bar when in standalone mode */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+/* Ensure bottom nav content doesn't sit behind home indicator */
+.pb-24 {
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+  .dark .glass {
+    background: rgba(15, 28, 20, 0.6);
+    border: 1px solid rgba(80, 180, 100, 0.15);
+  }
+  .glass-strong {
+    background: rgba(245, 240, 232, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+  }
+  .dark .glass-strong {
+    background: rgba(10, 22, 14, 0.92);
+    border: 1px solid rgba(80, 180, 100, 0.2);
+  }
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+  .animate-grow {
+    animation: grow 0.5s ease-out forwards;
+  }
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  .animate-night-glow {
+    animation: night-glow 3s ease-in-out infinite;
+  }
+}
+
+@keyframes night-glow {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(80, 200, 100, 0.35)); }
+  50% { filter: drop-shadow(0 0 14px rgba(80, 200, 100, 0.65)); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes grow {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
