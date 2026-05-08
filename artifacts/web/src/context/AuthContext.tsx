@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { setToken, clearToken, getToken } from "@/utils/api";
+import { setToken, clearToken, getToken, API_BASE } from "@/utils/api";
+
 
 export type AuthUser = {
   id: string;
@@ -74,7 +75,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function verifyToken(t: string) {
     try {
-      const res = await fetch("/api/users/me", {
+      const res = await fetch(`${API_BASE}/api/users/me`, {
+
         headers: { Authorization: `Bearer ${t}` },
       });
       if (res.ok) {
@@ -94,7 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function verifyTokenSilently(t: string) {
     try {
-      const res = await fetch("/api/users/me", {
+      const res = await fetch(`${API_BASE}/api/users/me`, {
+
         headers: { Authorization: `Bearer ${t}` },
       });
       if (res.ok) {
@@ -120,7 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function login(email: string, password: string) {
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -131,7 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function register(displayName: string, email: string, password: string, role = "student") {
-    const res = await fetch("/api/auth/register", {
+    const res = await fetch(`${API_BASE}/api/auth/register`, {
+
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ displayName, email, password, role }),
@@ -142,7 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function loginWithGoogle(credential: string) {
-    const res = await fetch("/api/auth/google", {
+    const res = await fetch(`${API_BASE}/api/auth/google`, {
+
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ credential }),

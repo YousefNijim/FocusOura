@@ -1,5 +1,7 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, type Auth } from "firebase/auth";
+import { API_BASE } from "@/utils/api";
+
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
@@ -8,7 +10,8 @@ let configPromise: Promise<void> | null = null;
 
 async function loadFirebaseConfig() {
   if (configLoaded) return;
-  const res = await fetch("/api/config/firebase");
+  const res = await fetch(`${API_BASE}/api/config/firebase`);
+
   if (!res.ok) throw new Error("Firebase not configured on server");
   const config = await res.json();
   if (getApps().length === 0) {

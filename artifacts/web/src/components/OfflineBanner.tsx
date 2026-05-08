@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
+import { API_BASE } from "@/utils/api";
+
 
 /**
  * Persistent banner that appears when the API server is unreachable.
@@ -16,7 +18,8 @@ export function OfflineBanner() {
     async function check() {
       try {
         // HEAD request: network error = server unreachable; any HTTP status = server alive
-        await fetch("/api/", { method: "HEAD", cache: "no-store" });
+        await fetch(`${API_BASE}/api/`, { method: "HEAD", cache: "no-store" });
+
         // Any response (even 404/401) means the server IS reachable
         if (cancelled) return;
         setIsOffline(false);

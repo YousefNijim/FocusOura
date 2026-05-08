@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle, Leaf, XCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { API_BASE } from "@/utils/api";
+
 
 type Status = "loading" | "success" | "error" | "no-token";
 type ResendStatus = "idle" | "loading" | "sent" | "error" | "rate-limited";
@@ -26,7 +28,8 @@ export default function VerifyEmail() {
 
     (async () => {
       try {
-        const res = await fetch(`/api/auth/verify-email?token=${encodeURIComponent(token)}`);
+        const res = await fetch(`${API_BASE}/api/auth/verify-email?token=${encodeURIComponent(token)}`);
+
         if (res.ok) {
           updateAuthUser({ emailVerified: true });
           setStatus("success");
@@ -61,7 +64,8 @@ export default function VerifyEmail() {
     setResendStatus("loading");
     setResendError("");
     try {
-      const res = await fetch("/api/auth/resend-verification", {
+      const res = await fetch(`${API_BASE}/api/auth/resend-verification`, {
+
         method: "POST",
         headers: { Authorization: `Bearer ${authToken}` },
       });

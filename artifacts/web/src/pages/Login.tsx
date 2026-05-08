@@ -3,6 +3,8 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Eye, EyeOff, Leaf } from "lucide-react";
 import { signInWithGoogle } from "@/lib/firebase";
+import { API_BASE } from "@/utils/api";
+
 
 export default function Login() {
   const navigate = useNavigate();
@@ -20,7 +22,8 @@ export default function Login() {
   }, [isAuthenticated, navigate]);
 
   useEffect(() => {
-    fetch("/api/config/firebase")
+    fetch(`${API_BASE}/api/config/firebase`)
+
       .then((r) => setFirebaseAvailable(r.ok))
       .catch(() => setFirebaseAvailable(false));
   }, []);

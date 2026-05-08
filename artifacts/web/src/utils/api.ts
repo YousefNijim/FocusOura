@@ -21,8 +21,9 @@ export const getUserId = (): string => {
 };
 
 // In development: Vite proxies /api/* to localhost:8080 — base is empty string
-// In Android APK: VITE_API_BASE_URL=http://192.168.x.x:8080 (your PC's WiFi IP)
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
+// In production: VITE_API_BASE_URL points to the deployed API server (e.g. Railway)
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+
 
 export async function fetchApi<T = unknown>(
   path: string,

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Mail, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { API_BASE } from "@/utils/api";
+
 
 const DISMISSED_KEY = "focusoura_verify_banner_dismissed";
 
@@ -37,7 +39,8 @@ export function VerificationBanner() {
     if (!token || resendStatus === "loading" || cooldown > 0) return;
     setResendStatus("loading");
     try {
-      const res = await fetch("/api/auth/resend-verification", {
+      const res = await fetch(`${API_BASE}/api/auth/resend-verification`, {
+
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
