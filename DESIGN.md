@@ -57,6 +57,9 @@
 **Mobile build: EAS Build — preview=APK (internal distribution), production=AAB (Google Play)**
 Bundle ID: `com.focusoura.app` | EAS Project: `660e5d47-78e3-4d62-982a-04136054c625`
 
+**Web deploy: Vercel — https://focusoura.vercel.app**
+**API deploy: Needs separate hosting (Railway/Render recommended) — see §6 for env vars**
+
 ### Database / Shared Libs
 | Package | Version |
 |---------|---------|
