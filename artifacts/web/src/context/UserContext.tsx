@@ -10,6 +10,8 @@ export type User = {
   authProvider: string;
   studyMode: "light" | "night";
   notificationsEnabled: boolean;
+  onboardingCompleted: boolean;
+  emailVerified: boolean;
   selectedPetId: string;
   unlockedPetIds: string[];
   createdAt: string;

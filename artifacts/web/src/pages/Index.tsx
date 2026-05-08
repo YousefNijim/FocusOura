@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { MobileLayout } from "@/components/MobileLayout";
+import { Onboarding } from "@/components/Onboarding";
 import { Coins, Flame, Sprout, ChevronRight, Leaf, Lock } from "lucide-react";
 import plant1 from "@/assets/plant-1.png";
 import plant2 from "@/assets/plant-2.png";
@@ -11,6 +12,7 @@ import { getPetById, getPetMoodFromKey } from "@/constants/pets";
 import { PetSelectModal } from "@/components/PetSelectModal";
 import { useToast } from "@/hooks/use-toast";
 import { useInventory } from "@/hooks/useInventory";
+import { CalendarSection } from "@/components/CalendarSection";
 
 const plantImages = [plant1, plant2, plant3];
 const PET_UNLOCK_THRESHOLD = 5;
@@ -65,6 +67,7 @@ const Dashboard = () => {
   }, [petUnlocked, loading, userId, toast]);
 
   return (
+    <>
     <MobileLayout>
       <div className="px-5 pt-6 space-y-5">
         {/* Header */}
@@ -103,6 +106,9 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* Calendar Section */}
+        <CalendarSection />
 
         {/* Start Session CTA */}
         <button
@@ -246,6 +252,12 @@ const Dashboard = () => {
         />
       )}
     </MobileLayout>
+
+    {/* Onboarding overlay — shown only on first login, never again */}
+    {!loading && user && !user.onboardingCompleted && (
+      <Onboarding onComplete={refreshData} />
+    )}
+    </>
   );
 };
 

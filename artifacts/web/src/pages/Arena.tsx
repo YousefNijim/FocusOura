@@ -660,7 +660,7 @@ function FriendsTab() {
     queryFn: () => fetchApi("/friends"),
     retry: 1,
   });
-  const { data: requests = [] } = useQuery<FriendRequest[]>({
+  const { data: requestsData } = useQuery<{ incoming: FriendRequest[]; outgoing: FriendRequest[] }>({
     queryKey: ["friend-requests"],
     queryFn: () => fetchApi("/friends/requests"),
     retry: 1,
@@ -687,7 +687,7 @@ function FriendsTab() {
     }).catch(() => toast({ title: "Couldn't copy", variant: "destructive" }));
   };
 
-  const incomingRequests = requests.filter((r) => r.from && r.status === "pending");
+  const incomingRequests = requestsData?.incoming?.filter((r) => r.from && r.status === "pending") ?? [];
 
   const handleSearch = (q: string) => {
     setSearchQuery(q);
@@ -704,17 +704,17 @@ function FriendsTab() {
   };
 
   const sendRequest = useMutation({
-    mutationFn: (toId: string) => fetchApi("/friends/request", { method: "POST", body: JSON.stringify({ toUserId: toId }) }),
+    mutationFn: (toId: string) => fetchApi("/friends/request", { method: "POST", body: JSON.stringify({ receiverId: toId }) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["friends"] }); toast({ title: "Request sent!" }); handleSearch(searchQuery); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
   const acceptRequest = useMutation({
-    mutationFn: (id: string) => fetchApi(`/friends/request/${id}/accept`, { method: "POST" }),
+    mutationFn: (id: string) => fetchApi(`/friends/${id}/accept`, { method: "PUT" }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["friends"] }); qc.invalidateQueries({ queryKey: ["friend-requests"] }); toast({ title: "Friend added!" }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
   const declineRequest = useMutation({
-    mutationFn: (id: string) => fetchApi(`/friends/request/${id}/decline`, { method: "POST" }),
+    mutationFn: (id: string) => fetchApi(`/friends/${id}/decline`, { method: "PUT" }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["friend-requests"] }); },
   });
   const removeFriend = useMutation({

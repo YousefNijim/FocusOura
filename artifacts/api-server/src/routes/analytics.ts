@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { sessionsTable, subjectsTable, plantsTable } from "@workspace/db";
 import { eq, and, gte, desc } from "drizzle-orm";
 import type { AuthRequest } from "../middleware/auth.js";
+import { getUserStreak } from "../lib/queries.js";
 
 const router: IRouter = Router();
 
@@ -70,23 +71,7 @@ router.get("/", async (req: AuthRequest, res) => {
   const sessionTypeBreakdown = Object.entries(typeMap).map(([type, data]) => ({ type, ...data }));
 
   // ── Streak calculation ────────────────────────────────────────────
-  const studyDates = new Set(completed.map((s) => s.startTime ? formatDate(s.startTime) : "").filter(Boolean));
-  let currentStreak = 0;
-  let longestStreak = 0;
-  let tempStreak = 0;
-  const todayStr = formatDate(todayStart);
-
-  for (let i = 0; i <= 365; i++) {
-    const d = new Date(todayStart); d.setDate(d.getDate() - i);
-    if (studyDates.has(formatDate(d))) {
-      tempStreak++;
-      if (i === 0 || currentStreak > 0) currentStreak = tempStreak;
-      longestStreak = Math.max(longestStreak, tempStreak);
-    } else {
-      if (i === 0) currentStreak = 0;
-      else tempStreak = 0;
-    }
-  }
+  const { currentStreak, longestStreak } = await getUserStreak(userId);
 
   // ── Aggregate stats ───────────────────────────────────────────────
   const totalFocusMinutes = completed.reduce((sum, s) => sum + (s.durationMinutes ?? 0), 0);

@@ -5,6 +5,8 @@ import {
   friendshipsTable,
 } from "@workspace/db";
 import { eq, or, and, ilike, ne, sql } from "drizzle-orm";
+import { sendPushNotification } from "../lib/push.js";
+import { requireVerified } from "../middleware/requireVerified.js";
 
 const router: IRouter = Router();
 
@@ -128,7 +130,7 @@ router.get("/requests", async (req, res) => {
   res.json({ incoming: incomingWithUsers, outgoing: outgoingWithUsers });
 });
 
-router.post("/request", async (req, res) => {
+router.post("/request", requireVerified, async (req, res) => {
   const userId = getUserId(req);
   const { receiverId } = req.body as { receiverId: string };
   if (!receiverId) return res.status(400).json({ error: "receiverId required" });
@@ -174,7 +176,19 @@ router.put("/:id/accept", async (req, res) => {
     .returning();
 
   if (!row) return res.status(404).json({ error: "Not found" });
+
   res.json(row);
+
+  const [accepter] = await db
+    .select({ displayName: usersTable.displayName })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+  void sendPushNotification([row.requesterId], {
+    title: "Friend request accepted! 🎉",
+    body: `${accepter?.displayName ?? "Someone"} accepted your friend request`,
+    data: { type: "friend_accepted", userId },
+  });
 });
 
 router.put("/:id/decline", async (req, res) => {

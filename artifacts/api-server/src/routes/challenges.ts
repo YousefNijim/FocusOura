@@ -5,6 +5,8 @@ import {
   walletsTable, transactionsTable, usersTable, friendshipsTable,
 } from "@workspace/db";
 import { eq, or, and, desc, inArray, gt, lt, lte } from "drizzle-orm";
+import { sendPushNotification } from "../lib/push.js";
+import { requireVerified } from "../middleware/requireVerified.js";
 
 const router: IRouter = Router();
 
@@ -80,6 +82,13 @@ async function resolveExpiredChallenges() {
     await db.update(challengesTable)
       .set({ status: "completed", winnerId, endTime: now })
       .where(eq(challengesTable.id, ch.id));
+
+    const participantIds = participants.map((p) => p.userId);
+    void sendPushNotification(participantIds, {
+      title: "Challenge complete! 🏆",
+      body: `"${ch.title}" has ended. Check your results!`,
+      data: { type: "challenge_resolved", challengeId: ch.id },
+    });
   }
 }
 
@@ -180,7 +189,7 @@ router.get("/", async (req, res) => {
 });
 
 // ─── POST /api/challenges ─────────────────────────────────────────────────────
-router.post("/", async (req, res) => {
+router.post("/", requireVerified, async (req, res) => {
   const userId = getUserId(req);
   const { title, challengeType, targetHours, durationDays, entryFee } = req.body as {
     title: string;
@@ -191,6 +200,19 @@ router.post("/", async (req, res) => {
   };
 
   if (!title?.trim()) return res.status(400).json({ error: "Title required" });
+
+  const validationErrors: Record<string, string> = {};
+  const parsedHours = Number(targetHours);
+  const parsedDays  = Number(durationDays);
+  if (!Number.isInteger(parsedHours) || parsedHours < 1 || parsedHours > 10000) {
+    validationErrors.targetHours = "Must be an integer between 1 and 10000";
+  }
+  if (!Number.isInteger(parsedDays) || parsedDays < 1 || parsedDays > 365) {
+    validationErrors.durationDays = "Must be an integer between 1 and 365";
+  }
+  if (Object.keys(validationErrors).length > 0) {
+    return res.status(400).json({ error: "Invalid challenge parameters", details: validationErrors });
+  }
 
   const fee = Math.max(0, Number(entryFee) || 0);
   const hours = Math.max(0.5, Number(targetHours) || 10);
@@ -235,7 +257,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // ─── POST /api/challenges/:id/join ────────────────────────────────────────────
-router.post("/:id/join", async (req, res) => {
+router.post("/:id/join", requireVerified, async (req, res) => {
   const userId = getUserId(req);
   const { id } = req.params;
 
@@ -272,7 +294,21 @@ router.post("/:id/join", async (req, res) => {
   });
 
   const [updated] = await db.select().from(challengesTable).where(eq(challengesTable.id, id)).limit(1);
-  res.json(await enrichChallenge(updated, userId));
+  const enriched = await enrichChallenge(updated, userId);
+  res.json(enriched);
+
+  if (ch.creatorId !== userId) {
+    const [joiner] = await db
+      .select({ displayName: usersTable.displayName })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+    void sendPushNotification([ch.creatorId], {
+      title: "Someone joined your challenge! 💪",
+      body: `${joiner?.displayName ?? "Someone"} joined "${ch.title}"`,
+      data: { type: "challenge_joined", challengeId: ch.id },
+    });
+  }
 });
 
 // ─── PUT /api/challenges/:id/progress ────────────────────────────────────────

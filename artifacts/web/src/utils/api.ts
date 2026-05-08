@@ -52,3 +52,23 @@ export async function fetchApi<T = unknown>(
 
   return response.json() as Promise<T>;
 }
+
+export type PauseResponse = {
+  sessionId: string;
+  status: "paused";
+  pausedAt: string;
+  pauseCount: number;
+};
+
+export type ResumeResponse = {
+  sessionId: string;
+  status: "active";
+  totalPausedMs: number;
+  pauseCount: number;
+};
+
+export const pauseSession  = (sessionId: string) =>
+  fetchApi<PauseResponse>(`/sessions/${sessionId}/pause`, { method: "POST" });
+
+export const resumeSession = (sessionId: string) =>
+  fetchApi<ResumeResponse>(`/sessions/${sessionId}/resume`, { method: "POST" });

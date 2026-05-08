@@ -6,6 +6,8 @@ import {
   timestamp,
   serial,
   json,
+  index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -22,6 +24,9 @@ export const usersTable = pgTable("users", {
   providerId: text("provider_id").unique(),
   studyMode: text("study_mode").notNull().default("light"),
   notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
+  onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  emailVerifiedAt: timestamp("email_verified_at"),
   selectedPetId: text("selected_pet_id").notNull().default("mochi"),
   unlockedPetIds: json("unlocked_pet_ids").$type<string[]>().notNull().default(["mochi"]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -42,6 +47,10 @@ export const subjectsTable = pgTable("subjects", {
   totalFocusMinutes: integer("total_focus_minutes").notNull().default(0),
   sessionCount: integer("session_count").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    userIdIdx: index("subjects_user_id_idx").on(table.userId),
+  };
 });
 
 export const insertSubjectSchema = createInsertSchema(subjectsTable).omit({
@@ -59,6 +68,11 @@ export const plantsTable = pgTable("plants", {
   growthPoints: integer("growth_points").notNull().default(0),
   maxGrowthPoints: integer("max_growth_points").notNull().default(100),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    userIdIdx: index("plants_user_id_idx").on(table.userId),
+    subjectIdIdx: index("plants_subject_id_idx").on(table.subjectId),
+  };
 });
 
 export const insertPlantSchema = createInsertSchema(plantsTable).omit({
@@ -71,6 +85,7 @@ export const sessionsTable = pgTable("sessions", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   subjectId: text("subject_id"),
+  calendarItemId: text("calendar_item_id"),
   plantId: text("plant_id"),
   sessionType: text("session_type").notNull(),
   state: text("state").notNull().default("initialized"),
@@ -78,7 +93,17 @@ export const sessionsTable = pgTable("sessions", {
   pointsEarned: integer("points_earned").notNull().default(0),
   startTime: timestamp("start_time").notNull().defaultNow(),
   endTime: timestamp("end_time"),
+  pausedAt: timestamp("paused_at"),
+  totalPausedMs: integer("total_paused_ms").notNull().default(0),
+  pauseCount: integer("pause_count").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    userIdIdx: index("sessions_user_id_idx").on(table.userId),
+    subjectIdIdx: index("sessions_subject_id_idx").on(table.subjectId),
+    calendarItemIdIdx: index("sessions_calendar_item_id_idx").on(table.calendarItemId),
+    startTimeIdx: index("sessions_start_time_idx").on(table.startTime),
+  };
 });
 
 export const insertSessionSchema = createInsertSchema(sessionsTable).omit({
@@ -94,6 +119,10 @@ export const sessionEventsTable = pgTable("session_events", {
   eventType: text("event_type").notNull(),
   eventTime: timestamp("event_time").notNull().defaultNow(),
   metadata: json("metadata"),
+}, (table) => {
+  return {
+    sessionIdIdx: index("session_events_session_id_idx").on(table.sessionId),
+  };
 });
 
 export const insertSessionEventSchema = createInsertSchema(sessionEventsTable).omit({
@@ -122,6 +151,10 @@ export const transactionsTable = pgTable("transactions", {
   description: text("description").notNull(),
   referenceId: text("reference_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    userIdIdx: index("transactions_user_id_idx").on(table.userId),
+  };
 });
 
 export const insertTransactionSchema = createInsertSchema(transactionsTable).omit({
@@ -151,6 +184,10 @@ export const aiInsightsTable = pgTable("ai_insights", {
   type: text("type").notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    userIdIdx: index("ai_insights_user_id_idx").on(table.userId),
+  };
 });
 
 export const insertAiInsightSchema = createInsertSchema(aiInsightsTable).omit({
@@ -167,6 +204,11 @@ export const friendshipsTable = pgTable("friendships", {
   inviteToken: text("invite_token"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    requesterIdIdx: index("friendships_requester_id_idx").on(table.requesterId),
+    receiverIdIdx: index("friendships_receiver_id_idx").on(table.receiverId),
+  };
 });
 
 export const insertFriendshipSchema = createInsertSchema(friendshipsTable).omit({
@@ -187,9 +229,13 @@ export const challengesTable = pgTable("challenges", {
   challengeType: text("challenge_type").notNull().default("competitive"),
   durationDays: integer("duration_days").notNull().default(7),
   startTime: timestamp("start_time"),
-  endTime: timestamp("end_time"),
+  endTime: timestamp("endTime"),
   winnerId: text("winner_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    creatorIdIdx: index("challenges_creator_id_idx").on(table.creatorId),
+  };
 });
 
 export const insertChallengeSchema = createInsertSchema(challengesTable).omit({
@@ -204,6 +250,11 @@ export const challengeParticipantsTable = pgTable("challenge_participants", {
   userId: text("user_id").notNull(),
   focusMinutes: integer("focus_minutes").notNull().default(0),
   joinedAt: timestamp("joined_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    challengeIdIdx: index("challenge_participants_challenge_id_idx").on(table.challengeId),
+    userIdIdx: index("challenge_participants_user_id_idx").on(table.userId),
+  };
 });
 
 export const insertChallengeParticipantSchema = createInsertSchema(challengeParticipantsTable).omit({
@@ -234,8 +285,71 @@ export const userInventoryTable = pgTable("user_inventory", {
   itemId: text("item_id").notNull(),
   equipped: boolean("equipped").notNull().default(false),
   purchasedAt: timestamp("purchased_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    userIdIdx: index("user_inventory_user_id_idx").on(table.userId),
+  };
 });
 
 export const insertUserInventorySchema = createInsertSchema(userInventoryTable).omit({ purchasedAt: true });
 export type InsertUserInventory = z.infer<typeof insertUserInventorySchema>;
 export type UserInventory = typeof userInventoryTable.$inferSelect;
+
+export const calendarItemsTable = pgTable("calendar_items", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  subjectId: text("subject_id"),
+  title: text("title").notNull(),
+  type: text("type").notNull().default("homework"), // exam, homework, other
+  dueDate: timestamp("due_date").notNull(),
+  completed: boolean("completed").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => {
+  return {
+    userIdIdx: index("calendar_user_id_idx").on(table.userId),
+    subjectIdIdx: index("calendar_subject_id_idx").on(table.subjectId),
+    dueDateIdx: index("calendar_due_date_idx").on(table.dueDate),
+  };
+});
+
+export const insertCalendarItemSchema = createInsertSchema(calendarItemsTable).omit({ createdAt: true });
+export type InsertCalendarItem = z.infer<typeof insertCalendarItemSchema>;
+export type CalendarItem = typeof calendarItemsTable.$inferSelect;
+
+export const pushTokensTable = pgTable("push_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  token: text("token").notNull(),
+  deviceId: text("device_id"),
+  platform: text("platform"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastUsed: timestamp("last_used"),
+}, (table) => ({
+  userIdIdx: index("push_tokens_user_id_idx").on(table.userId),
+  userTokenUniq: uniqueIndex("push_tokens_user_token_idx").on(table.userId, table.token),
+}));
+
+export const passwordResetTokensTable = pgTable("password_reset_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  tokenHashIdx: index("prt_token_hash_idx").on(table.tokenHash),
+  userIdIdx: index("prt_user_id_idx").on(table.userId),
+}));
+
+export const emailVerificationTokensTable = pgTable("email_verification_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  tokenHashIdx: index("evt_token_hash_idx").on(table.tokenHash),
+  userIdIdx: index("evt_user_id_idx").on(table.userId),
+}));
+

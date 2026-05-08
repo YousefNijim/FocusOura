@@ -9,9 +9,14 @@ import {
   transactionsTable,
   challengeParticipantsTable,
   challengesTable,
+  calendarItemsTable,
 } from "@workspace/db";
-import { eq, and, desc, isNull, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, isNull, inArray, sql, gte } from "drizzle-orm";
 import { getUserId, ensureUser } from "./users.js";
+import { PLANT_GROWTH } from "../lib/constants.js";
+import { logger } from "../lib/logger.js";
+import { sendPushNotification } from "../lib/push.js";
+import { requireVerified } from "../middleware/requireVerified.js";
 
 const router: IRouter = Router();
 
@@ -87,7 +92,7 @@ router.get("/active", async (req, res) => {
   const active = await db
     .select()
     .from(sessionsTable)
-    .where(and(eq(sessionsTable.userId, userId), eq(sessionsTable.state, "started")))
+    .where(and(eq(sessionsTable.userId, userId), inArray(sessionsTable.state, ["started", "paused"])))
     .limit(1);
 
   if (!active.length) {
@@ -106,6 +111,16 @@ router.get("/active", async (req, res) => {
     subjectName = subject[0]?.name ?? "General";
   }
 
+  let activeCalendarItemTitle: string | null = null;
+  if (s.calendarItemId) {
+    const [calItem] = await db
+      .select({ title: calendarItemsTable.title })
+      .from(calendarItemsTable)
+      .where(eq(calendarItemsTable.id, s.calendarItemId))
+      .limit(1);
+    activeCalendarItemTitle = calItem?.title ?? null;
+  }
+
   res.json({
     session: {
       id: s.id,
@@ -118,6 +133,11 @@ router.get("/active", async (req, res) => {
       endTime: s.endTime?.toISOString() ?? null,
       durationMinutes: s.durationMinutes,
       pointsEarned: s.pointsEarned,
+      pausedAt: s.pausedAt?.toISOString() ?? null,
+      totalPausedMs: s.totalPausedMs ?? 0,
+      pauseCount: s.pauseCount ?? 0,
+      calendarItemId: s.calendarItemId,
+      calendarItemTitle: activeCalendarItemTitle,
       createdAt: s.createdAt?.toISOString() ?? new Date().toISOString(),
     },
   });
@@ -164,11 +184,11 @@ router.get("/", async (req, res) => {
   );
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireVerified, async (req, res) => {
   const userId = getUserId(req);
   await ensureUser(userId);
 
-  const { subjectId, plantType, sessionType, durationMinutes } = req.body;
+  const { subjectId, calendarItemId, plantType, sessionType, durationMinutes } = req.body;
 
   if (!plantType || !sessionType || !durationMinutes) {
     res.status(400).json({ error: "plantType, sessionType, durationMinutes required" });
@@ -214,6 +234,7 @@ router.post("/", async (req, res) => {
     id: sessionId,
     userId,
     subjectId: resolvedSubjectId,
+    calendarItemId: calendarItemId || null,
     plantId: resolvedPlantId,
     sessionType,
     state: "started",
@@ -230,6 +251,16 @@ router.post("/", async (req, res) => {
     metadata: { sessionType, plantType },
   });
 
+  let calendarItemTitle: string | null = null;
+  if (calendarItemId) {
+    const [calItem] = await db
+      .select({ title: calendarItemsTable.title })
+      .from(calendarItemsTable)
+      .where(eq(calendarItemsTable.id, calendarItemId))
+      .limit(1);
+    calendarItemTitle = calItem?.title ?? null;
+  }
+
   res.status(201).json({
     id: sessionId,
     subjectId: resolvedSubjectId,
@@ -241,7 +272,107 @@ router.post("/", async (req, res) => {
     endTime: null,
     durationMinutes,
     pointsEarned: 0,
+    calendarItemId: calendarItemId || null,
+    calendarItemTitle,
     createdAt: new Date().toISOString(),
+  });
+});
+
+router.post("/:sessionId/pause", async (req, res) => {
+  const userId = getUserId(req);
+  const { sessionId } = req.params;
+
+  const [session] = await db
+    .select()
+    .from(sessionsTable)
+    .where(and(eq(sessionsTable.id, sessionId), eq(sessionsTable.userId, userId)))
+    .limit(1);
+
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+  if (session.state !== "started") {
+    res.status(400).json({ error: "Session is not active" });
+    return;
+  }
+
+  const now = new Date();
+  const [updated] = await db
+    .update(sessionsTable)
+    .set({ state: "paused", pausedAt: now, pauseCount: sql`pause_count + 1` })
+    .where(eq(sessionsTable.id, sessionId))
+    .returning({ pauseCount: sessionsTable.pauseCount });
+
+  res.json({
+    sessionId,
+    status: "paused",
+    pausedAt: now.toISOString(),
+    pauseCount: updated?.pauseCount ?? 1,
+  });
+});
+
+router.post("/:sessionId/resume", async (req, res) => {
+  const userId = getUserId(req);
+  const { sessionId } = req.params;
+
+  const [session] = await db
+    .select()
+    .from(sessionsTable)
+    .where(and(eq(sessionsTable.id, sessionId), eq(sessionsTable.userId, userId)))
+    .limit(1);
+
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+  if (session.state !== "paused") {
+    res.status(400).json({ error: "Session is not paused" });
+    return;
+  }
+
+  const now = new Date();
+  const pauseDuration = now.getTime() - (session.pausedAt?.getTime() ?? now.getTime());
+
+  // Auto-abort if paused for more than 2 hours
+  if (pauseDuration > 2 * 60 * 60 * 1000) {
+    await db
+      .update(sessionsTable)
+      .set({
+        state: "aborted",
+        endTime: now,
+        totalPausedMs: sql`total_paused_ms + ${pauseDuration}`,
+        pausedAt: null,
+      })
+      .where(eq(sessionsTable.id, sessionId));
+
+    await db.insert(sessionEventsTable).values({
+      id: `evt_${Date.now()}_pause_timeout`,
+      sessionId,
+      userId,
+      eventType: "aborted",
+      metadata: { reason: "pause_timeout", pauseDuration },
+    });
+
+    res.status(400).json({ error: "Session expired during pause" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(sessionsTable)
+    .set({
+      state: "started",
+      totalPausedMs: sql`total_paused_ms + ${pauseDuration}`,
+      pausedAt: null,
+    })
+    .where(eq(sessionsTable.id, sessionId))
+    .returning({ totalPausedMs: sessionsTable.totalPausedMs, pauseCount: sessionsTable.pauseCount });
+
+  res.json({
+    sessionId,
+    status: "active",
+    totalPausedMs: updated?.totalPausedMs ?? 0,
+    pauseCount: updated?.pauseCount ?? 0,
   });
 });
 
@@ -265,6 +396,12 @@ router.put("/:sessionId", async (req, res) => {
   const endTime = new Date();
 
   const actualMinutes = rawActualMinutes ?? session.durationMinutes;
+
+  // Finalize total_paused_ms if completing/aborting from a paused state
+  let finalTotalPausedMs = session.totalPausedMs ?? 0;
+  if (session.state === "paused" && session.pausedAt) {
+    finalTotalPausedMs += endTime.getTime() - session.pausedAt.getTime();
+  }
 
   let pointsEarned = 0;
   if (state === "completed" || (state === "aborted" && actualMinutes >= 1)) {
@@ -299,7 +436,7 @@ router.put("/:sessionId", async (req, res) => {
         while (newPoints >= maxPoints) {
           newPoints -= maxPoints;
           newLevel += 1;
-          maxPoints = maxPoints + 50; // Additive scaling: 100, 150, 200, 250... (was ×1.5: too steep)
+          maxPoints = PLANT_GROWTH.calculateNextMax(maxPoints);
         }
 
         await db
@@ -322,19 +459,41 @@ router.put("/:sessionId", async (req, res) => {
         .where(eq(walletsTable.userId, userId));
     }
 
-    await db.insert(transactionsTable).values({
-      id: `txn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      userId,
-      type: "reward",
-      amount: pointsEarned,
-      description: `Completed ${session.sessionType} session`,
-      referenceId: sessionId,
-    });
-  }
+      await db.insert(transactionsTable).values({
+        id: `txn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        userId,
+        type: "reward",
+        amount: pointsEarned,
+        description: `Completed ${session.sessionType} session`,
+        referenceId: sessionId,
+      });
+
+      // Mark calendar item as completed if linked
+      if (session.calendarItemId) {
+        try {
+          await db.update(calendarItemsTable)
+            .set({ completed: true })
+            .where(eq(calendarItemsTable.id, session.calendarItemId));
+        } catch (err) {
+          logger.warn({
+            msg: "Failed to mark calendar item as completed after session",
+            error: err instanceof Error ? err.message : String(err),
+            context: { sessionId, userId, calendarItemId: session.calendarItemId },
+          });
+        }
+      }
+    }
 
   await db
     .update(sessionsTable)
-    .set({ state, endTime, pointsEarned, durationMinutes: actualMinutes })
+    .set({
+      state,
+      endTime,
+      pointsEarned,
+      durationMinutes: actualMinutes,
+      totalPausedMs: finalTotalPausedMs,
+      pausedAt: null,
+    })
     .where(eq(sessionsTable.id, sessionId));
 
   // Auto-update challenge progress for any active challenges this user is in
@@ -361,7 +520,14 @@ router.put("/:sessionId", async (req, res) => {
           }
         }
       }
-    } catch (_) {}
+    } catch (error) {
+      // TODO: Add to a dead-letter queue for manual resolution
+      logger.error({
+        msg: "Failed to update challenge progress after session completion — participant minutes may be out of sync",
+        error: error instanceof Error ? error.message : String(error),
+        context: { sessionId, userId },
+      });
+    }
   }
 
   await db.insert(sessionEventsTable).values({
@@ -371,6 +537,32 @@ router.put("/:sessionId", async (req, res) => {
     eventType: state === "completed" ? "completed" : "aborted",
     metadata: { pointsEarned },
   });
+
+  // Fire daily-goal notification when the user crosses the 60-minute threshold today
+  // (replace 60 with user.dailyGoalMinutes once that column is added)
+  if (state === "completed") {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    db.select({ total: sql<number>`COALESCE(SUM(${sessionsTable.durationMinutes}), 0)::int` })
+      .from(sessionsTable)
+      .where(and(
+        eq(sessionsTable.userId, userId),
+        eq(sessionsTable.state, "completed"),
+        gte(sessionsTable.startTime, todayStart),
+      ))
+      .then(([stats]) => {
+        const totalToday = stats?.total ?? 0;
+        const prevTotal = totalToday - actualMinutes;
+        if (prevTotal < 60 && totalToday >= 60) {
+          void sendPushNotification([userId], {
+            title: "Daily goal reached! 🌱",
+            body: "You hit your study goal for today. Amazing work!",
+            data: { type: "goal_reached" },
+          });
+        }
+      })
+      .catch(() => {});
+  }
 
   let subjectName = "General";
   if (session.subjectId) {
@@ -391,8 +583,11 @@ router.put("/:sessionId", async (req, res) => {
     state,
     startTime: session.startTime?.toISOString() ?? new Date().toISOString(),
     endTime: endTime.toISOString(),
-    durationMinutes: session.durationMinutes,
+    durationMinutes: actualMinutes,
     pointsEarned,
+    totalPausedMs: finalTotalPausedMs,
+    pauseCount: session.pauseCount ?? 0,
+    actualStudyMinutes: actualMinutes,
     createdAt: session.createdAt?.toISOString() ?? new Date().toISOString(),
   });
 });

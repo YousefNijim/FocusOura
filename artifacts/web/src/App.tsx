@@ -7,6 +7,7 @@ import { UserProvider } from "@/context/UserContext";
 import { SessionProvider } from "@/context/SessionContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { VerificationBanner } from "@/components/VerificationBanner";
 import { useEffect } from "react";
 import Index from "./pages/Index";
 import FocusSession from "./pages/FocusSession";
@@ -18,6 +19,9 @@ import Store from "./pages/Store";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Welcome from "./pages/Welcome";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import VerifyEmail from "./pages/VerifyEmail";
 import TransactionHistory from "./pages/TransactionHistory";
 import AdminPanel from "./pages/AdminPanel";
 
@@ -91,6 +95,23 @@ function AppRoutes() {
             : <Register />
         }
       />
+      <Route
+        path="/forgot-password"
+        element={
+          isAuthenticated
+            ? <Navigate to="/" replace />
+            : <ForgotPassword />
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          isAuthenticated
+            ? <Navigate to="/" replace />
+            : <ResetPassword />
+        }
+      />
+      <Route path="/verify-email" element={<VerifyEmail />} />
       <Route
         path="/"
         element={
@@ -184,6 +205,7 @@ const App = () => (
         <AuthProvider>
           <ThemeApplier />
           <OfflineBanner />
+          <VerificationBanner />
           <SessionProvider>
             <AppRoutes />
           </SessionProvider>

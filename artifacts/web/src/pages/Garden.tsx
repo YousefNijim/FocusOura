@@ -45,41 +45,24 @@ const colorOptions = [
   "#2D6A4F","#52B788","#74C69D","#B7E4C7","#95D5B2","#40916C","#1B4332","#E9C46A",
 ];
 
-// ─── Isometric Grid Constants ────────────────────────────────────────────────
-const GRID_N    = 5;
-const TW        = 72;   // tile iso-width
-const TH        = 36;   // tile iso-height
-const DEPTH     = 13;   // earth side depth
-const SVG_W     = 380;
-const ORIG_X    = SVG_W / 2;
-const ORIG_Y    = 74;   // top padding for tallest plants
-const SVG_H     = ORIG_Y + GRID_N * TH + DEPTH + 18;
-
-// ─── Tile geometry ───────────────────────────────────────────────────────────
-function topPts(cx: number, cy: number) {
-  return `${cx},${cy-TH/2} ${cx+TW/2},${cy} ${cx},${cy+TH/2} ${cx-TW/2},${cy}`;
-}
-function leftPts(cx: number, cy: number) {
-  return `${cx-TW/2},${cy} ${cx},${cy+TH/2} ${cx},${cy+TH/2+DEPTH} ${cx-TW/2},${cy+DEPTH}`;
-}
-function rightPts(cx: number, cy: number) {
-  return `${cx+TW/2},${cy} ${cx},${cy+TH/2} ${cx},${cy+TH/2+DEPTH} ${cx+TW/2},${cy+DEPTH}`;
-}
-
-
 // ─── Isometric Garden SVG ─────────────────────────────────────────────────────
 function IsoGarden({ plants, subjects }: {
   plants: { id: string; growthLevel: number; subjectId: string; plantType?: string }[];
   subjects: { id: string; name: string; accentColor: string }[];
 }) {
+  const GRID_N = 8;
+  const ORIG_X = 340;
+  const ORIG_Y = 130;
+  const STEP_X = 35;
+  const STEP_Y = 18.75;
+  
   const tiles = useMemo(() => {
     const t = [];
     for (let row = 0; row < GRID_N; row++) {
       for (let col = 0; col < GRID_N; col++) {
-        const cx = ORIG_X + (col - row) * TW / 2;
-        const cy = ORIG_Y + (col + row) * TH / 2;
-        const shade = (row + col) % 2 === 0;
-        t.push({ row, col, cx, cy, shade });
+        const cx = ORIG_X + (col - row) * STEP_X;
+        const cy = ORIG_Y + (col + row + 1) * STEP_Y; // Center of the tile
+        t.push({ row, col, cx, cy });
       }
     }
     return t.sort((a, b) => (a.row + a.col) - (b.row + b.col));
@@ -96,58 +79,62 @@ function IsoGarden({ plants, subjects }: {
   return (
     <svg
       width="100%"
-      viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+      viewBox="0 0 680 500"
       style={{ display: "block", overflow: "visible" }}
     >
       <defs>
-        <filter id="shadow" x="-25%" y="-25%" width="150%" height="150%">
-          <feDropShadow dx="0" dy="4" stdDeviation="3.5" floodColor="#1a3a0e" floodOpacity="0.45" />
-        </filter>
-        <filter id="softShadow" x="-25%" y="-25%" width="150%" height="150%">
-          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#0d2208" floodOpacity="0.3" />
-        </filter>
-        {/* Grass texture pattern */}
-        <pattern id="grassTex" x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
-          <circle cx="3"  cy="4"  r="1"   fill="#000" opacity="0.04" />
-          <circle cx="9"  cy="8"  r="0.8" fill="#000" opacity="0.04" />
-          <circle cx="6"  cy="2"  r="0.7" fill="#fff" opacity="0.06" />
-        </pattern>
+        <clipPath id="grassClip">
+          <polygon points="60,280 340,130 620,280 340,430"/>
+        </clipPath>
       </defs>
 
-      {/* ── Tile faces ── */}
-      {tiles.map(({ row, col, cx, cy, shade }) => {
-        // Grass shades
-        const topFill  = shade ? "#79C94E" : "#6BBE43";
-        const leftFill = row === GRID_N - 1 ? "#8B6543" : (shade ? "#4D9E2E" : "#438C27");
-        const rightFill= col === GRID_N - 1 ? "#7A5438" : (shade ? "#3E8023" : "#35711D");
+      {/* Soil Base */}
+      <polygon points="60,280 340,430 340,468 60,318" fill="#8B5E3C" />
+      <polygon points="60,280 340,430 340,468 60,318" fill="#5a3010" opacity="0.25" />
+      <polygon points="340,430 620,280 620,318 340,468" fill="#6B4220" />
+      <polygon points="340,430 620,280 620,318 340,468" fill="#3a1e08" opacity="0.3" />
 
-        return (
-          <g key={`${row}-${col}`}>
-            {/* Left depth face */}
-            <polygon points={leftPts(cx, cy)} fill={leftFill} />
-            {/* Right depth face */}
-            <polygon points={rightPts(cx, cy)} fill={rightFill} />
-            {/* Top grass face */}
-            <polygon points={topPts(cx, cy)} fill={topFill} stroke="#3A8020" strokeWidth="0.5" />
-            {/* Grass texture overlay */}
-            <polygon points={topPts(cx, cy)} fill="url(#grassTex)" />
-          </g>
-        );
-      })}
+      {/* Soil bottom edge */}
+      <line x1="60" y1="318" x2="340" y2="468" stroke="#4a2e10" strokeWidth="1.5" />
+      <line x1="340" y1="468" x2="620" y2="318" stroke="#3a1e08" strokeWidth="1.5" />
 
-      {/* ── Outer earth border lines ── */}
-      {/* Bottom-left edge line */}
-      {Array.from({ length: GRID_N }, (_, i) => {
-        const cx = ORIG_X + (0 - i) * TW / 2;
-        const cy = ORIG_Y + (0 + i) * TH / 2;
-        return (
-          <line key={`bl${i}`}
-            x1={cx - TW / 2} y1={cy + DEPTH}
-            x2={cx} y2={cy + TH / 2 + DEPTH}
-            stroke="#5A3E26" strokeWidth="0.8"
-          />
-        );
-      })}
+      {/* Grass Surface */}
+      <polygon points="60,280 340,130 620,280 340,430" fill="#5bbf5b" />
+      {/* Highlight top-left */}
+      <polygon points="60,280 340,130 480,205 200,355" fill="#70d070" opacity="0.3" />
+      {/* Shadow bottom-right */}
+      <polygon points="480,205 620,280 340,430 200,355" fill="#3a9e3a" opacity="0.15" />
+
+      {/* Grid Lines */}
+      <g clipPath="url(#grassClip)" stroke="#3d9e3d" strokeWidth="0.8" opacity="0.55">
+        {/* Lines parallel to LEFT edge */}
+        <line x1="375" y1="148.75" x2="95" y2="298.75" />
+        <line x1="410" y1="167.5" x2="130" y2="317.5" />
+        <line x1="445" y1="186.25" x2="165" y2="336.25" />
+        <line x1="480" y1="205" x2="200" y2="355" />
+        <line x1="515" y1="223.75" x2="235" y2="373.75" />
+        <line x1="550" y1="242.5" x2="270" y2="392.5" />
+        <line x1="585" y1="261.25" x2="305" y2="411.25" />
+        <line x1="620" y1="280" x2="340" y2="430" />
+
+        {/* Lines parallel to RIGHT edge */}
+        <line x1="340" y1="130" x2="620" y2="280" />
+        <line x1="305" y1="148.75" x2="585" y2="298.75" />
+        <line x1="270" y1="167.5" x2="550" y2="317.5" />
+        <line x1="235" y1="186.25" x2="515" y2="336.25" />
+        <line x1="200" y1="205" x2="480" y2="355" />
+        <line x1="165" y1="223.75" x2="445" y2="373.75" />
+        <line x1="130" y1="242.5" x2="410" y2="392.5" />
+        <line x1="95" y1="261.25" x2="375" y2="411.25" />
+        <line x1="60" y1="280" x2="340" y2="430" />
+      </g>
+
+      {/* Grass Border */}
+      <polygon points="60,280 340,130 620,280 340,430" fill="none" stroke="#3a9e3a" strokeWidth="1.8" />
+
+      {/* Soil top edge highlight */}
+      <line x1="60" y1="280" x2="340" y2="430" stroke="#a07050" strokeWidth="1.2" opacity="0.7" />
+      <line x1="340" y1="430" x2="620" y2="280" stroke="#805030" strokeWidth="1.2" opacity="0.7" />
 
       {/* ── Plants layer ── */}
       {tiles.map(({ row, col, cx, cy }) => {
@@ -158,22 +145,22 @@ function IsoGarden({ plants, subjects }: {
           if (seed < 2) {
             return (
               <g key={`grass-${row}-${col}`}>
-                <ellipse cx={cx - 4} cy={cy - TH / 2 + 3} rx="2.5" ry="1.2" fill="#4FA82E" opacity="0.4" />
-                <ellipse cx={cx + 4} cy={cy - TH / 2 + 4} rx="2" ry="1"    fill="#4FA82E" opacity="0.4" />
+                <ellipse cx={cx - 6} cy={cy + 5} rx="3.5" ry="1.5" fill="#4FA82E" opacity="0.4" />
+                <ellipse cx={cx + 6} cy={cy + 6} rx="3" ry="1.2"    fill="#4FA82E" opacity="0.4" />
               </g>
             );
           }
           return null;
         }
 
-        // Scale by growth level: lvl1=0.55, lvl2=0.75, lvl3+=1.0
+        // Scale by growth level
         const scale = plant.growthLevel >= 3 ? 1.0 : plant.growthLevel >= 2 ? 0.75 : 0.55;
-        const SIZE  = 54 * scale;
+        const SIZE  = 90 * scale; // Increased size to match larger viewBox
         const imgSrc = PLANT_IMAGES[plant.plantType ?? "fern"] ?? PLANT_IMAGES["fern"];
 
         // Center the image on the tile top, anchored at the base
         const ix = cx - SIZE / 2;
-        const iy = cy - TH / 2 - SIZE + 6;
+        const iy = cy - SIZE + 10; // offset a bit to sit perfectly on grid cell
 
         return (
           <image
@@ -183,7 +170,7 @@ function IsoGarden({ plants, subjects }: {
             y={iy}
             width={SIZE}
             height={SIZE}
-            style={{ filter: "drop-shadow(0px 4px 5px rgba(0,30,0,0.5))" }}
+            style={{ filter: "drop-shadow(0px 6px 8px rgba(0,30,0,0.5))" }}
           />
         );
       })}

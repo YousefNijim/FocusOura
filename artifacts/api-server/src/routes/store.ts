@@ -4,6 +4,7 @@ import { storeItemsTable, userInventoryTable, walletsTable, transactionsTable } 
 import { eq, and, sql } from "drizzle-orm";
 import { getUserId } from "./users.js";
 import { randomUUID } from "crypto";
+import { requireVerified } from "../middleware/requireVerified.js";
 
 const router: IRouter = Router();
 
@@ -94,7 +95,7 @@ router.get("/inventory", async (req, res) => {
   );
 });
 
-router.post("/buy", async (req, res) => {
+router.post("/buy", requireVerified, async (req, res) => {
   const userId = getUserId(req);
   const { itemId } = req.body;
 

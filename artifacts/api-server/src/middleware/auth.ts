@@ -1,7 +1,15 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { isSessionInvalidated } from "../lib/sessionInvalidation.js";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "focusoura-dev-secret-change-in-production";
+if (!process.env.JWT_SECRET) {
+  throw new Error(
+    "JWT_SECRET environment variable is not set. " +
+    "Server cannot start without a secure secret."
+  );
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -11,8 +19,11 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith("Bearer ")) {
     try {
-      const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as { sub: string };
+      const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as { sub: string; iat: number };
       req.userId = payload.sub;
+      if (isSessionInvalidated(payload.sub, payload.iat)) {
+        return res.status(401).json({ error: "Session expired. Please log in again." });
+      }
       return next();
     } catch {
       return res.status(401).json({ error: "Invalid or expired token" });

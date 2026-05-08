@@ -11,6 +11,8 @@ export type AuthUser = {
   authProvider: string;
   studyMode: string;
   notificationsEnabled: boolean;
+  onboardingCompleted: boolean;
+  emailVerified: boolean;
   createdAt: string;
 };
 

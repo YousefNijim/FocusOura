@@ -12,6 +12,10 @@ router.get("/firebase", (_req, res) => {
     apiKey,
     authDomain: `${projectId}.firebaseapp.com`,
     projectId,
+    storageBucket: `${projectId}.firebasestorage.app`,
+    messagingSenderId: "327116942106",
+    appId: "1:327116942106:web:8da5cdf4ca2cfa17f49aa3",
+    measurementId: "G-P8Q0EFXZHS"
   });
 });
 

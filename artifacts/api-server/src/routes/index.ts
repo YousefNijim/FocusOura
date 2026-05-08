@@ -15,6 +15,8 @@ import petsRouter from "./pets.js";
 import analyticsRouter from "./analytics.js";
 import storeRouter from "./store.js";
 import adminRouter from "./admin.js";
+import calendarRouter from "./calendar.js";
+import notificationsRouter from "./notifications.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const router: IRouter = Router();
@@ -37,5 +39,7 @@ router.use("/pets", authMiddleware, petsRouter);
 router.use("/analytics", authMiddleware, analyticsRouter);
 router.use("/store", authMiddleware, storeRouter);
 router.use("/admin", authMiddleware, adminRouter);
+router.use("/calendar", authMiddleware, calendarRouter);
+router.use("/notifications", authMiddleware, notificationsRouter);
 
 export default router;

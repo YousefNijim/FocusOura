@@ -16,6 +16,8 @@ export interface StoredSession {
   sessionTypeMultiplier: number;
   subjectId:            string;
   subjectName:          string;
+  calendarItemId?:      string;
+  calendarItemTitle?:   string;
   countdownMins:        number;
   startTimestamp:       number;   // Date.now() when timer last started/resumed
   accumulatedSecs:      number;   // Seconds accrued before the current run
@@ -29,6 +31,7 @@ export interface StartSessionParams {
   sessionTypeMultiplier: number;
   subjectId?:           string;
   subjectName?:         string;
+  calendarItemId?:      string;
   countdownMins:        number;
   mode:                 "countdown" | "stopwatch";
 }
@@ -138,11 +141,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [timeLeft, session?.state]);
 
   const startSession = useCallback(async (p: StartSessionParams) => {
-    const res = await fetchApi<{ id: string }>("/sessions", {
+    const res = await fetchApi<{ id: string; calendarItemTitle?: string }>("/sessions", {
       method: "POST",
       body: JSON.stringify({
         plantType:      p.plantType,
         subjectId:      p.subjectId || undefined,
+        calendarItemId: p.calendarItemId || undefined,
         sessionType:    p.sessionTypeId,
         durationMinutes: p.countdownMins || 1,
       }),
@@ -156,6 +160,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       sessionTypeMultiplier: p.sessionTypeMultiplier,
       subjectId:             p.subjectId  ?? "",
       subjectName:           p.subjectName ?? "",
+      calendarItemId:        p.calendarItemId,
+      calendarItemTitle:     res.calendarItemTitle,
       countdownMins:         p.countdownMins,
       startTimestamp:        Date.now(),
       accumulatedSecs:       0,

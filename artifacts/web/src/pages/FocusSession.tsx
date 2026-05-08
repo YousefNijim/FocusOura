@@ -1,18 +1,21 @@
 import { useState, useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { MobileLayout } from "@/components/MobileLayout";
 import {
   Play, Pause, Square, ChevronDown, BookOpen, Brain, Dumbbell,
   ChevronLeft, ChevronRight, Sprout, X, Leaf, Timer, Zap, Lock, AlertTriangle,
-  Heart, Send, SkipForward, Volume2, VolumeX,
+  Heart, Send, SkipForward, Volume2, VolumeX, CalendarDays,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useSession } from "@/context/SessionContext";
-import { fetchApi } from "@/utils/api";
+import { fetchApi, pauseSession as apiPauseSession, resumeSession as apiResumeSession } from "@/utils/api";
 import { useToast } from "@/hooks/use-toast";
 import { PLANT_CATALOG } from "@/constants/plants";
 import { useAmbientSound } from "@/hooks/useAmbientSound";
 import { AmbientSoundPicker } from "@/components/AmbientSoundPicker";
 import { useInventory } from "@/hooks/useInventory";
+import { useMotivationMessage } from "@/hooks/useMotivationMessage";
 
 const SESSION_TYPES = [
   { id: "routine",    label: "Routine",    icon: BookOpen, multiplier: 1 },
@@ -236,13 +239,18 @@ function formatTime(secs: number) {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function FocusSession() {
+  const location = useLocation();
+  const navSubjectId = (location.state as { subjectId?: string } | null)?.subjectId ?? "";
   const { subjects, refreshData }   = useUser();
   const { equipped }                = useInventory();
   const focusBg                     = equipped.focus_bg;
   const { toast }                   = useToast();
   const {
     session, elapsedSecs, plantsEarned, timeLeft,
-    startSession, pauseSession, resumeSession, completeSession, stopSession,
+    startSession,
+    pauseSession: ctxPauseSession,
+    resumeSession: ctxResumeSession,
+    completeSession, stopSession,
     setAutoCompleteCallback,
   } = useSession();
 
@@ -250,13 +258,21 @@ export default function FocusSession() {
   const [timerMode, setTimerMode]             = useState<TimerMode>(session?.mode ?? "countdown");
   const [plantIndex, setPlantIndex]           = useState(session?.plantIndex ?? 0);
   const [sessionType, setSessionType]         = useState(SESSION_TYPES.find(t => t.id === session?.sessionTypeId) ?? SESSION_TYPES[0]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState(session?.subjectId ?? "");
+  const [selectedSubjectId, setSelectedSubjectId] = useState(session?.subjectId ?? navSubjectId);
   const [countdownMins, setCountdownMins]     = useState(session?.countdownMins ?? 25);
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
   const [loading, setLoading]                 = useState(false);
   const [showWallet, setShowWallet]           = useState(false);
+  const [showGoalPicker, setShowGoalPicker]   = useState(false);
+  const [selectedGoalId, setSelectedGoalId]   = useState("");
   const [plants, setPlants]                   = useState<PlantRecord[]>([]);
   const [done, setDone]                       = useState(false);
+
+  // Pause tracking — pauseCountRef keeps the latest count for the auto-complete closure
+  const pauseCountRef                         = useRef(0);
+  const [pauseCount, setPauseCount]           = useState(0);
+  const [completionPauseCount, setCompletionPauseCount] = useState(0);
+  const [completionActualMins, setCompletionActualMins] = useState(0);
 
   const [receivedMessage, setReceivedMessage] = useState<{ id: string; content: string; source?: string } | null>(null);
   const [messageText, setMessageText]         = useState("");
@@ -268,6 +284,7 @@ export default function FocusSession() {
   const [showSoundPicker, setShowSoundPicker] = useState(false);
 
   const { sound, volume, isPlaying, setSound, setVolume, SOUND_META } = useAmbientSound();
+  const { message: motivationMessage, refetch: refetchMotivation } = useMotivationMessage();
 
   // Sync local defaults from active session (on page enter)
   useEffect(() => {
@@ -277,8 +294,14 @@ export default function FocusSession() {
       setSessionType(SESSION_TYPES.find(t => t.id === session.sessionTypeId) ?? SESSION_TYPES[0]);
       setSelectedSubjectId(session.subjectId);
       setCountdownMins(session.countdownMins);
+      setSelectedGoalId(session.calendarItemId || "");
     }
   }, [session?.sessionId]);
+
+  const { data: calendarItems = [] } = useQuery({
+    queryKey: ["calendar"],
+    queryFn: () => fetchApi("/calendar"),
+  });
 
   useEffect(() => {
     fetchApi<PlantRecord[]>("/plants").then(setPlants).catch(() => {});
@@ -301,6 +324,8 @@ export default function FocusSession() {
           setReceivedMessage({ id: "fallback", content: "Every session you complete is a step forward. Keep going — you're building something great!", source: "system" });
         });
       setLastSessionId(info.sessionId);
+      setCompletionActualMins(info.actualMinutes);
+      setCompletionPauseCount(pauseCountRef.current);
       setWasCompleted(true);
       setDone(true);
       setSound("off");
@@ -334,6 +359,7 @@ export default function FocusSession() {
   const handleStart = async () => {
     setLoading(true);
     setDone(false);
+    refetchMotivation();
     try {
       await startSession({
         plantIndex,
@@ -342,6 +368,7 @@ export default function FocusSession() {
         sessionTypeMultiplier: sessionType.multiplier,
         subjectId:            selectedSubjectId || undefined,
         subjectName:          subjects.find(s => s.id === selectedSubjectId)?.name,
+        calendarItemId:       selectedGoalId || undefined,
         countdownMins,
         mode: timerMode,
       });
@@ -352,11 +379,39 @@ export default function FocusSession() {
     }
   };
 
+  const handlePause = async () => {
+    if (!session) return;
+    ctxPauseSession(); // freeze UI immediately
+    try {
+      const res = await apiPauseSession(session.sessionId);
+      pauseCountRef.current = res.pauseCount;
+      setPauseCount(res.pauseCount);
+    } catch {
+      ctxResumeSession(); // revert on API failure
+      toast({ title: "Couldn't pause", description: "Please try again", variant: "destructive" });
+    }
+  };
+
+  const handleResume = async () => {
+    if (!session) return;
+    try {
+      const res = await apiResumeSession(session.sessionId);
+      pauseCountRef.current = res.pauseCount;
+      setPauseCount(res.pauseCount);
+      ctxResumeSession(); // unfreeze UI only after backend confirms
+    } catch {
+      // Keep paused if resume fails — do not revert
+      toast({ title: "Couldn't resume", description: "Please try again", variant: "destructive" });
+    }
+  };
+
   const handleComplete = async () => {
     setLoading(true);
     const currentSessionId = session?.sessionId ?? null;
     try {
       const { actualMinutes, earned } = await completeSession();
+      setCompletionActualMins(actualMinutes);
+      setCompletionPauseCount(pauseCountRef.current);
       const updated = await fetchApi<PlantRecord[]>("/plants");
       setPlants(updated);
       await refreshData();
@@ -414,6 +469,10 @@ export default function FocusSession() {
     setMessageSkipped(false);
     setLastSessionId(null);
     setWasCompleted(false);
+    pauseCountRef.current = 0;
+    setPauseCount(0);
+    setCompletionPauseCount(0);
+    setCompletionActualMins(0);
   };
 
   const NEGATIVE_WORDS = ["stupid", "dumb", "worthless", "idiot", "useless", "failure", "loser", "hate", "kill", "die"];
@@ -558,20 +617,38 @@ export default function FocusSession() {
 
           {/* Active countdown */}
           {session?.mode === "countdown" && isActive && (
-            <ProgressRing progress={countdownProgress}>
-              <img src={activePlantImg} alt="plant" className={`w-14 h-14 object-contain mb-0.5 ${isRunning ? "animate-float" : ""}`} />
-              <span className="text-3xl font-bold text-foreground font-mono leading-none">{formatTime(timeLeft)}</span>
-              <span className="text-[11px] text-muted-foreground mt-0.5">{isPaused ? "Paused" : "Focusing"}</span>
-            </ProgressRing>
+            <div className={`transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}>
+              <ProgressRing progress={countdownProgress}>
+                <img src={activePlantImg} alt="plant" className={`w-14 h-14 object-contain mb-0.5 ${isRunning ? "animate-float" : ""}`} />
+                <span className="text-3xl font-bold text-foreground font-mono leading-none">{formatTime(timeLeft)}</span>
+                {isPaused ? (
+                  <span className="flex items-center gap-1 text-[11px] text-amber-500 mt-0.5 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    Paused
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground mt-0.5">Focusing</span>
+                )}
+              </ProgressRing>
+            </div>
           )}
 
           {/* Active stopwatch */}
           {session?.mode === "stopwatch" && isActive && (
-            <ProgressRing progress={stopwatchProgress}>
-              <img src={activePlantImg} alt="plant" className={`w-14 h-14 object-contain mb-0.5 ${isRunning ? "animate-float" : ""}`} />
-              <span className="text-3xl font-bold text-foreground font-mono leading-none">{formatTime(elapsedSecs)}</span>
-              <span className="text-[11px] text-muted-foreground mt-0.5">{isPaused ? "Paused" : "Focusing"}</span>
-            </ProgressRing>
+            <div className={`transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}>
+              <ProgressRing progress={stopwatchProgress}>
+                <img src={activePlantImg} alt="plant" className={`w-14 h-14 object-contain mb-0.5 ${isRunning ? "animate-float" : ""}`} />
+                <span className="text-3xl font-bold text-foreground font-mono leading-none">{formatTime(elapsedSecs)}</span>
+                {isPaused ? (
+                  <span className="flex items-center gap-1 text-[11px] text-amber-500 mt-0.5 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    Paused
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground mt-0.5">Focusing</span>
+                )}
+              </ProgressRing>
+            </div>
           )}
 
           {/* Done */}
@@ -579,7 +656,9 @@ export default function FocusSession() {
             <ProgressRing progress={1}>
               <img src={activePlantImg} alt="plant" className="w-14 h-14 object-contain mb-0.5" />
               <span className="text-xl font-bold text-primary font-mono">Done!</span>
-              <span className="text-[11px] text-muted-foreground mt-0.5">{actualElapsedMins}m studied</span>
+              <span className="text-[11px] text-muted-foreground mt-0.5">
+                {completionActualMins > 0 ? `${completionActualMins}m studied` : `${actualElapsedMins}m studied`}
+              </span>
             </ProgressRing>
           )}
 
@@ -591,28 +670,25 @@ export default function FocusSession() {
                 <Play size={18} fill="currentColor" /> Start
               </button>
             )}
-            {isRunning && (
+            {isActive && (
               <>
-                <button onClick={pauseSession} className="w-12 h-12 rounded-full glass flex items-center justify-center hover:bg-card/80 transition-all">
-                  <Pause size={20} className="text-foreground" />
-                </button>
-                <button onClick={handleComplete} disabled={loading}
-                  className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full font-semibold shadow-lg hover:opacity-90 transition-all active:scale-95">
+                {isRunning ? (
+                  <button onClick={handlePause}
+                    className="w-12 h-12 rounded-full glass flex items-center justify-center hover:bg-card/80 transition-all">
+                    <Pause size={20} className="text-foreground" />
+                  </button>
+                ) : (
+                  <button onClick={handleResume}
+                    className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full font-semibold shadow-lg hover:opacity-90 transition-all active:scale-95">
+                    <Play size={16} fill="currentColor" /> Resume
+                  </button>
+                )}
+                <button onClick={handleComplete} disabled={isPaused || loading}
+                  className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full font-semibold shadow-lg hover:opacity-90 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed">
                   Complete
                 </button>
-                <button onClick={handleStop} className="w-12 h-12 rounded-full glass flex items-center justify-center hover:bg-card/80 transition-all">
-                  <Square size={18} className="text-muted-foreground" />
-                </button>
-              </>
-            )}
-            {isPaused && (
-              <>
-                <button onClick={resumeSession}
-                  className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full font-semibold shadow-lg hover:opacity-90 transition-all active:scale-95">
-                  <Play size={18} fill="currentColor" /> Resume
-                </button>
                 <button onClick={handleStop} disabled={loading}
-                  className="w-12 h-12 rounded-full glass flex items-center justify-center hover:bg-card/80 transition-all">
+                  className="w-12 h-12 rounded-full glass flex items-center justify-center hover:bg-card/80 transition-all disabled:opacity-40">
                   <Square size={18} className="text-muted-foreground" />
                 </button>
               </>
@@ -625,6 +701,16 @@ export default function FocusSession() {
             )}
           </div>
         </div>
+
+        {/* ── DONE STATE: Pause stats ─────────────────────────────────────── */}
+        {isDone && wasCompleted && completionPauseCount > 0 && (
+          <div className="glass rounded-xl px-4 py-3 text-center">
+            <p className="text-xs text-muted-foreground">
+              Paused {completionPauseCount} time{completionPauseCount !== 1 ? "s" : ""} — actual study time:{" "}
+              <span className="font-semibold text-foreground">{completionActualMins} min</span>
+            </p>
+          </div>
+        )}
 
         {/* ── DONE STATE: Human message received ─────────────────────────── */}
         {isDone && wasCompleted && receivedMessage && (
@@ -721,38 +807,43 @@ export default function FocusSession() {
             </div>
           </div>
         )}
-
-        {/* Subject (idle only) */}
+        {/* Goal Picker (idle only) */}
         {isIdle && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Subject</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Goal / Task</p>
               <span className="text-[10px] text-muted-foreground italic">Optional</span>
             </div>
-            {subjects.length === 0 ? (
+            {calendarItems.filter(i => !i.completed).length === 0 ? (
               <div className="glass rounded-xl p-3 text-center text-xs text-muted-foreground">
-                Add subjects in Garden to link sessions
+                No upcoming tasks. Add them on Dashboard.
               </div>
             ) : (
               <>
-                <button onClick={() => setShowSubjectPicker(!showSubjectPicker)}
+                <button onClick={() => setShowGoalPicker(!showGoalPicker)}
                   className="w-full glass rounded-xl p-3.5 flex items-center justify-between">
                   <span className="text-sm text-foreground">
-                    {selectedSubject?.name || "No subject — General Progress"}
+                    {calendarItems.find(i => i.id === selectedGoalId)?.title || "No specific goal"}
                   </span>
                   <ChevronDown size={15} className="text-muted-foreground" />
                 </button>
-                {showSubjectPicker && (
-                  <div className="glass rounded-xl overflow-hidden">
-                    <button onClick={() => { setSelectedSubjectId(""); setShowSubjectPicker(false); }}
-                      className={`w-full text-left px-4 py-3 text-sm hover:bg-card/80 transition-all border-b border-border/50 ${!selectedSubjectId ? "text-primary font-medium" : "text-foreground"}`}>
-                      No subject — General Progress
+                {showGoalPicker && (
+                  <div className="glass rounded-xl overflow-hidden mt-1">
+                    <button onClick={() => { setSelectedGoalId(""); setShowGoalPicker(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm hover:bg-card/80 transition-all border-b border-border/50 ${!selectedGoalId ? "text-primary font-medium" : "text-foreground"}`}>
+                      No specific goal
                     </button>
-                    {subjects.map((s) => (
-                      <button key={s.id} onClick={() => { setSelectedSubjectId(s.id); setShowSubjectPicker(false); }}
-                        className={`w-full text-left px-4 py-3 text-sm hover:bg-card/80 transition-all border-b border-border/50 last:border-b-0 ${selectedSubjectId === s.id ? "text-primary font-medium" : "text-foreground"}`}>
-                        {s.name}
-                        <span className="text-muted-foreground ml-2 text-xs font-normal">{s.totalFocusMinutes}m studied</span>
+                    {calendarItems.filter(i => !i.completed).map((i) => (
+                      <button key={i.id} onClick={() => { 
+                        setSelectedGoalId(i.id); 
+                        if (i.subjectId) setSelectedSubjectId(i.subjectId);
+                        setShowGoalPicker(false); 
+                      }}
+                        className={`w-full text-left px-4 py-3 text-sm hover:bg-card/80 transition-all border-b border-border/50 last:border-b-0 ${selectedGoalId === i.id ? "text-primary font-medium" : "text-foreground"}`}>
+                        <div className="flex items-center justify-between">
+                          <span>{i.title}</span>
+                          {i.subjectName && <span className="text-[10px] opacity-70 px-1.5 py-0.5 rounded bg-primary/10">{i.subjectName}</span>}
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -789,7 +880,23 @@ export default function FocusSession() {
                 <p className="text-sm font-medium text-foreground">{session.subjectName}</p>
               </div>
             )}
+            {session?.calendarItemTitle && (
+              <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-center gap-1.5">
+                <CalendarDays size={12} className="text-muted-foreground flex-shrink-0" />
+                <p className="text-xs text-muted-foreground truncate">
+                  Linked to:{" "}
+                  <span className="font-medium text-foreground">{session.calendarItemTitle}</span>
+                </p>
+              </div>
+            )}
           </div>
+        )}
+
+        {/* Motivation message — shown while session is active */}
+        {isActive && motivationMessage && (
+          <p className="text-xs text-muted-foreground italic text-center leading-relaxed px-2">
+            &ldquo;{motivationMessage.content}&rdquo;
+          </p>
         )}
       </div>
 

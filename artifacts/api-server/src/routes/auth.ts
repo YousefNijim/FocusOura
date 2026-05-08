@@ -1,9 +1,50 @@
 import { Router, type IRouter } from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { db } from "@workspace/db";
-import { usersTable, walletsTable } from "@workspace/db";
-import { eq, or } from "drizzle-orm";
+import {
+  usersTable, walletsTable, passwordResetTokensTable, emailVerificationTokensTable,
+} from "@workspace/db";
+import { eq, or, and, isNull, gte, sql } from "drizzle-orm";
 import { createToken } from "../middleware/auth.js";
+import { logger } from "../lib/logger.js";
+import { sendEmail, sendVerificationEmail } from "../lib/email.js";
+import { recordPasswordReset } from "../lib/sessionInvalidation.js";
+import { authMiddleware } from "../middleware/auth.js";
+import type { AuthRequest } from "../middleware/auth.js";
+
+// ─── In-memory rate limiter: max 3 forgot-password requests per email per hour ─
+const forgotRateLimit = new Map<string, { count: number; windowEnd: number }>();
+function checkForgotRateLimit(email: string): boolean {
+  const now = Date.now();
+  const entry = forgotRateLimit.get(email);
+  if (!entry || now > entry.windowEnd) {
+    forgotRateLimit.set(email, { count: 1, windowEnd: now + 60 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 3) return false;
+  entry.count++;
+  return true;
+}
+
+// ─── Verification email helper ──────────────────────────────────────────────
+async function sendVerificationTokenEmail(userId: string, email: string, displayName: string) {
+  const rawToken  = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+  await db.insert(emailVerificationTokensTable).values({
+    id: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    userId,
+    tokenHash,
+    expiresAt,
+  });
+
+  const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:22334";
+  const verifyLink  = `${frontendUrl}/verify-email?token=${rawToken}`;
+
+  await sendVerificationEmail({ to: email, displayName, verifyLink });
+}
 
 const router: IRouter = Router();
 
@@ -31,6 +72,7 @@ async function createUserWithWallet(data: {
   role?: string;
   authProvider?: string;
   providerId?: string | null;
+  emailVerified?: boolean;
 }) {
   const userCode = await generateUniqueUserCode();
   await db.insert(usersTable).values({
@@ -45,6 +87,7 @@ async function createUserWithWallet(data: {
     providerId: data.providerId ?? null,
     studyMode: "light",
     notificationsEnabled: true,
+    emailVerified: data.emailVerified ?? false,
   }).onConflictDoNothing();
   await db.insert(walletsTable).values({ userId: data.id, balance: 100 }).onConflictDoNothing();
 }
@@ -78,6 +121,12 @@ router.post("/register", async (req, res) => {
     });
     const user = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
     const token = createToken(id);
+
+    // Fire verification email non-blocking — never delay or fail registration
+    void sendVerificationTokenEmail(id, email.toLowerCase(), displayName.trim()).catch((err) =>
+      logger.error({ msg: "Failed to send verification email after registration", error: err instanceof Error ? err.message : String(err) })
+    );
+
     return res.status(201).json({
       token,
       user: {
@@ -93,7 +142,7 @@ router.post("/register", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Register error:", err);
+    logger.error({ msg: "Register error", error: err instanceof Error ? err.message : String(err) });
     return res.status(500).json({ error: "Registration failed" });
   }
 });
@@ -136,7 +185,7 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Login error:", err);
+    logger.error({ msg: "Login error", error: err instanceof Error ? err.message : String(err) });
     return res.status(500).json({ error: "Login failed" });
   }
 });
@@ -161,7 +210,7 @@ router.post("/google", async (req, res) => {
     );
     if (!firebaseRes.ok) {
       const errData = await firebaseRes.json().catch(() => ({}));
-      console.error("Firebase token lookup error:", errData);
+      logger.error({ msg: "Firebase token lookup error", error: JSON.stringify(errData) });
       return res.status(401).json({ error: "Invalid Google credential" });
     }
     const firebaseData = (await firebaseRes.json()) as {
@@ -209,6 +258,7 @@ router.post("/google", async (req, res) => {
         authProvider: "google",
         providerId: firebaseUser.localId,
         avatarUrl: firebaseUser.photoUrl ?? null,
+        emailVerified: true,
       });
     }
     const user = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
@@ -229,8 +279,214 @@ router.post("/google", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Google auth error:", err);
+    logger.error({ msg: "Google auth error", error: err instanceof Error ? err.message : String(err) });
     return res.status(500).json({ error: "Google authentication failed" });
+  }
+});
+
+// ─── POST /auth/forgot-password ──────────────────────────────────────────────
+router.post("/forgot-password", async (req, res) => {
+  // Always return the same response — never reveal whether an email is registered
+  const SAFE_RESPONSE = { message: "If this email exists, a reset link has been sent" };
+
+  try {
+    const { email } = req.body;
+    if (!email || typeof email !== "string") return res.json(SAFE_RESPONSE);
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    if (!checkForgotRateLimit(normalizedEmail)) {
+      return res.json(SAFE_RESPONSE); // rate-limited; still return 200 to prevent enumeration
+    }
+
+    const [user] = await db
+      .select({ id: usersTable.id, email: usersTable.email, displayName: usersTable.displayName })
+      .from(usersTable)
+      .where(eq(usersTable.email, normalizedEmail))
+      .limit(1);
+
+    if (!user) return res.json(SAFE_RESPONSE);
+
+    const rawToken   = crypto.randomBytes(32).toString("hex");
+    const tokenHash  = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const expiresAt  = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await db.insert(passwordResetTokensTable).values({
+      id: `prt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      userId: user.id,
+      tokenHash,
+      expiresAt,
+    });
+
+    const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:22334";
+    const resetLink   = `${frontendUrl}/reset-password?token=${rawToken}`;
+
+    await sendEmail({
+      to:      user.email,
+      subject: "Reset your Focusoura password",
+      text: [
+        `Hi ${user.displayName},`,
+        "",
+        "You requested a password reset for your Focusoura account.",
+        "Click the link below to set a new password.",
+        "This link expires in 1 hour.",
+        "",
+        resetLink,
+        "",
+        "If you did not request this, ignore this email.",
+        "Your password will not change.",
+      ].join("\n"),
+    });
+
+    return res.json(SAFE_RESPONSE);
+  } catch (err) {
+    logger.error({ msg: "Forgot password error", error: err instanceof Error ? err.message : String(err) });
+    return res.json(SAFE_RESPONSE); // never expose server errors to caller
+  }
+});
+
+// ─── POST /auth/reset-password ────────────────────────────────────────────────
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({ error: "Reset link is invalid or has expired" });
+    }
+    if (!newPassword || typeof newPassword !== "string" || newPassword.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const now       = new Date();
+
+    const [found] = await db
+      .select()
+      .from(passwordResetTokensTable)
+      .where(
+        and(
+          eq(passwordResetTokensTable.tokenHash, tokenHash),
+          isNull(passwordResetTokensTable.usedAt),
+        )
+      )
+      .limit(1);
+
+    if (!found || found.expiresAt < now) {
+      return res.status(400).json({ error: "Reset link is invalid or has expired" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await db.update(usersTable)
+      .set({ passwordHash })
+      .where(eq(usersTable.id, found.userId));
+
+    // Mark this token used AND invalidate all other pending tokens for this user
+    await db.update(passwordResetTokensTable)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(passwordResetTokensTable.userId, found.userId),
+          isNull(passwordResetTokensTable.usedAt),
+        )
+      );
+
+    // Invalidate all existing JWT sessions for this user
+    recordPasswordReset(found.userId);
+
+    return res.json({ message: "Password reset successful" });
+  } catch (err) {
+    logger.error({ msg: "Reset password error", error: err instanceof Error ? err.message : String(err) });
+    return res.status(500).json({ error: "Password reset failed. Please try again." });
+  }
+});
+
+// ─── GET /auth/verify-email?token=<raw-token> ────────────────────────────────
+router.get("/verify-email", async (req, res) => {
+  const { token } = req.query as { token?: string };
+
+  if (!token || typeof token !== "string") {
+    return res.status(400).json({ error: "Verification link is invalid or has expired" });
+  }
+
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const now       = new Date();
+
+  const [found] = await db
+    .select()
+    .from(emailVerificationTokensTable)
+    .where(
+      and(
+        eq(emailVerificationTokensTable.tokenHash, tokenHash),
+        isNull(emailVerificationTokensTable.usedAt),
+      )
+    )
+    .limit(1);
+
+  if (!found || found.expiresAt < now) {
+    return res.status(400).json({ error: "Verification link is invalid or has expired" });
+  }
+
+  await db.update(usersTable)
+    .set({ emailVerified: true, emailVerifiedAt: now })
+    .where(eq(usersTable.id, found.userId));
+
+  await db.update(emailVerificationTokensTable)
+    .set({ usedAt: now })
+    .where(eq(emailVerificationTokensTable.id, found.id));
+
+  return res.json({ message: "Email verified successfully" });
+});
+
+// ─── POST /auth/resend-verification ──────────────────────────────────────────
+router.post("/resend-verification", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId!;
+
+    const [user] = await db
+      .select({ email: usersTable.email, displayName: usersTable.displayName, emailVerified: usersTable.emailVerified })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (user.emailVerified) {
+      return res.status(400).json({ error: "Email is already verified" });
+    }
+
+    // Rate limit: max 3 resend requests per user per hour (checked against DB)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const [{ recentCount }] = await db
+      .select({ recentCount: sql<number>`count(*)::int` })
+      .from(emailVerificationTokensTable)
+      .where(
+        and(
+          eq(emailVerificationTokensTable.userId, userId),
+          gte(emailVerificationTokensTable.createdAt, oneHourAgo),
+        )
+      );
+
+    if (recentCount >= 3) {
+      return res.status(429).json({ error: "Too many verification emails sent. Please wait before trying again." });
+    }
+
+    // Invalidate all previous unused tokens for this user
+    await db.delete(emailVerificationTokensTable)
+      .where(
+        and(
+          eq(emailVerificationTokensTable.userId, userId),
+          isNull(emailVerificationTokensTable.usedAt),
+        )
+      );
+
+    await sendVerificationTokenEmail(userId, user.email, user.displayName);
+
+    return res.json({ message: "Verification email sent" });
+  } catch (err) {
+    logger.error({ msg: "Resend verification error", error: err instanceof Error ? err.message : String(err) });
+    return res.status(500).json({ error: "Failed to send verification email. Please try again." });
   }
 });
 

@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { plantsTable, subjectsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { getUserId, ensureUser } from "./users.js";
+import { PLANT_GROWTH } from "../lib/constants.js";
 
 const router: IRouter = Router();
 
@@ -65,7 +66,7 @@ router.put("/:plantId", async (req, res) => {
   while (newPoints >= maxPoints) {
     newPoints -= maxPoints;
     newLevel += 1;
-    maxPoints = Math.floor(maxPoints * 1.5);
+    maxPoints = PLANT_GROWTH.calculateNextMax(maxPoints);
   }
 
   await db
