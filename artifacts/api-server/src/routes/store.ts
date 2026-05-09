@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { storeItemsTable, userInventoryTable, walletsTable, transactionsTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, gte } from "drizzle-orm";
 import { getUserId } from "./users.js";
 import { randomUUID } from "crypto";
 import { requireVerified } from "../middleware/requireVerified.js";
@@ -121,22 +121,16 @@ router.post("/buy", requireVerified, async (req, res) => {
     return;
   }
 
-  let walletRows = await db.select().from(walletsTable).where(eq(walletsTable.userId, userId)).limit(1);
-  if (!walletRows.length) {
-    await db.insert(walletsTable).values({ userId, balance: 0 });
-    walletRows = [{ userId, balance: 0, lastUpdated: new Date() }];
-  }
+  const [deducted] = await db
+    .update(walletsTable)
+    .set({ balance: sql`${walletsTable.balance} - ${item.price}`, lastUpdated: new Date() })
+    .where(and(eq(walletsTable.userId, userId), gte(walletsTable.balance, item.price)))
+    .returning({ newBalance: walletsTable.balance });
 
-  const wallet = walletRows[0];
-  if (wallet.balance < item.price) {
+  if (!deducted) {
     res.status(400).json({ error: "Insufficient balance" });
     return;
   }
-
-  await db
-    .update(walletsTable)
-    .set({ balance: wallet.balance - item.price, lastUpdated: new Date() })
-    .where(eq(walletsTable.userId, userId));
 
   await db.insert(transactionsTable).values({
     id: randomUUID(),
@@ -154,7 +148,7 @@ router.post("/buy", requireVerified, async (req, res) => {
     equipped: false,
   });
 
-  res.json({ success: true, newBalance: wallet.balance - item.price });
+  res.json({ success: true, newBalance: deducted.newBalance });
 });
 
 router.post("/equip", async (req, res) => {

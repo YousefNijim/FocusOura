@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { usersTable, walletsTable, transactionsTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, gte, and } from "drizzle-orm";
 import type { AuthRequest } from "../middleware/auth.js";
 
 const router: IRouter = Router();
@@ -115,14 +115,14 @@ router.post("/unlock", async (req: AuthRequest, res) => {
   }
 
   if (pet.unlock.type === "coins") {
-    const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, userId));
-    if (!wallet || wallet.balance < pet.unlock.value) {
+    const txId = `tx_pet_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const [deducted] = await db.update(walletsTable)
+      .set({ balance: sql`${walletsTable.balance} - ${pet.unlock.value}`, lastUpdated: new Date() })
+      .where(and(eq(walletsTable.userId, userId), gte(walletsTable.balance, pet.unlock.value)))
+      .returning({ balance: walletsTable.balance });
+    if (!deducted) {
       res.status(400).json({ error: `Need ${pet.unlock.value} coins to unlock ${pet.name}` }); return;
     }
-    const txId = `tx_pet_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    await db.update(walletsTable)
-      .set({ balance: wallet.balance - pet.unlock.value, lastUpdated: new Date() })
-      .where(eq(walletsTable.userId, userId));
     await db.insert(transactionsTable).values({
       id: txId,
       userId,

@@ -4,7 +4,7 @@ import {
   usersTable,
   friendshipsTable,
 } from "@workspace/db";
-import { eq, or, and, ilike, ne, sql } from "drizzle-orm";
+import { eq, or, and, ilike, ne, sql, inArray } from "drizzle-orm";
 import { sendPushNotification } from "../lib/push.js";
 import { requireVerified } from "../middleware/requireVerified.js";
 
@@ -83,14 +83,12 @@ router.get("/", async (req, res) => {
   const friendIds = rows.map((r) => (r.requesterId === userId ? r.receiverId : r.requesterId));
   if (friendIds.length === 0) return res.json([]);
 
-  const friendUsers = await Promise.all(
-    friendIds.map((fid) =>
-      db.select({ id: usersTable.id, userCode: usersTable.userCode, displayName: usersTable.displayName })
-        .from(usersTable).where(eq(usersTable.id, fid)).limit(1)
-    )
-  );
+  const friendUsers = await db
+    .select({ id: usersTable.id, userCode: usersTable.userCode, displayName: usersTable.displayName })
+    .from(usersTable)
+    .where(inArray(usersTable.id, friendIds));
 
-  const friends = friendUsers.flat().map((u) => {
+  const friends = friendUsers.map((u) => {
     const row = rows.find((r) => r.requesterId === u.id || r.receiverId === u.id)!;
     return { ...u, friendshipId: row.id, since: row.updatedAt };
   });
@@ -111,21 +109,19 @@ router.get("/requests", async (req, res) => {
     .from(friendshipsTable)
     .where(and(eq(friendshipsTable.requesterId, userId), eq(friendshipsTable.status, "pending")));
 
-  const incomingWithUsers = await Promise.all(
-    incoming.map(async (f) => {
-      const [user] = await db.select({ id: usersTable.id, userCode: usersTable.userCode, displayName: usersTable.displayName })
-        .from(usersTable).where(eq(usersTable.id, f.requesterId)).limit(1);
-      return { ...f, from: user };
-    })
-  );
+  const requesterIds = incoming.map((f) => f.requesterId);
+  const receiverIds  = outgoing.map((f) => f.receiverId);
+  const allIds = [...new Set([...requesterIds, ...receiverIds])];
+  const usersMap = allIds.length > 0
+    ? await db
+        .select({ id: usersTable.id, userCode: usersTable.userCode, displayName: usersTable.displayName })
+        .from(usersTable)
+        .where(inArray(usersTable.id, allIds))
+        .then((rows) => new Map(rows.map((u) => [u.id, u])))
+    : new Map<string, { id: string; userCode: number | null; displayName: string }>();
 
-  const outgoingWithUsers = await Promise.all(
-    outgoing.map(async (f) => {
-      const [user] = await db.select({ id: usersTable.id, userCode: usersTable.userCode, displayName: usersTable.displayName })
-        .from(usersTable).where(eq(usersTable.id, f.receiverId)).limit(1);
-      return { ...f, to: user };
-    })
-  );
+  const incomingWithUsers = incoming.map((f) => ({ ...f, from: usersMap.get(f.requesterId) }));
+  const outgoingWithUsers = outgoing.map((f) => ({ ...f, to: usersMap.get(f.receiverId) }));
 
   res.json({ incoming: incomingWithUsers, outgoing: outgoingWithUsers });
 });

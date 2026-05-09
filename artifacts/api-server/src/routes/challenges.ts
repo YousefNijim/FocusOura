@@ -4,7 +4,7 @@ import {
   challengesTable, challengeParticipantsTable,
   walletsTable, transactionsTable, usersTable, friendshipsTable,
 } from "@workspace/db";
-import { eq, or, and, desc, inArray, gt, lt, lte } from "drizzle-orm";
+import { eq, or, and, desc, inArray, gt, lt, lte, sql, gte } from "drizzle-orm";
 import { sendPushNotification } from "../lib/push.js";
 import { requireVerified } from "../middleware/requireVerified.js";
 
@@ -26,18 +26,22 @@ async function resolveExpiredChallenges() {
     .where(and(eq(challengesTable.status, "active"), lt(challengesTable.endTime, now)));
 
   for (const ch of expired) {
+    // Optimistic lock: mark completed first (WHERE status = 'active') to prevent
+    // double-processing when resolveExpiredChallenges runs concurrently on parallel requests
+    const [locked] = await db.update(challengesTable)
+      .set({ status: "completed", endTime: now })
+      .where(and(eq(challengesTable.id, ch.id), eq(challengesTable.status, "active")))
+      .returning({ id: challengesTable.id });
+
+    if (!locked) continue; // Already processed by a concurrent call
+
     const participants = await db
       .select()
       .from(challengeParticipantsTable)
       .where(eq(challengeParticipantsTable.challengeId, ch.id))
       .orderBy(desc(challengeParticipantsTable.focusMinutes));
 
-    if (participants.length === 0) {
-      await db.update(challengesTable)
-        .set({ status: "completed" })
-        .where(eq(challengesTable.id, ch.id));
-      continue;
-    }
+    if (participants.length === 0) continue;
 
     const targetMinutes = ch.durationMinutes;
     let winnerId: string | null = null;
@@ -47,41 +51,36 @@ async function resolveExpiredChallenges() {
       winnerId = participants[0].userId;
       if (ch.stake > 0 && winnerId) {
         const totalPrize = ch.stake * participants.length;
-        const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, winnerId)).limit(1);
-        if (wallet) {
-          await db.update(walletsTable).set({ balance: wallet.balance + totalPrize }).where(eq(walletsTable.userId, winnerId));
-          await db.insert(transactionsTable).values({
-            id: genId("tx"), userId: winnerId, type: "challenge_win",
-            amount: totalPrize, description: `Won challenge: ${ch.title}`,
-          });
-        }
+        await db.update(walletsTable)
+          .set({ balance: sql`${walletsTable.balance} + ${totalPrize}` })
+          .where(eq(walletsTable.userId, winnerId));
+        await db.insert(transactionsTable).values({
+          id: genId("tx"), userId: winnerId, type: "challenge_win",
+          amount: totalPrize, description: `Won challenge: ${ch.title}`,
+        });
       }
     } else {
-      // Cooperative: success if EVERY participant reached target
-      const totalFocus = participants.reduce((s, p) => s + p.focusMinutes, 0);
-      const cooperativeSuccess = totalFocus >= targetMinutes * participants.length;
-      if (cooperativeSuccess) {
-        // Everyone gets their stake back + bonus from losers (n/a since all win)
-        // Simple: everyone gets their stake back
-        if (ch.stake > 0) {
-          for (const p of participants) {
-            const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, p.userId)).limit(1);
-            if (wallet) {
-              await db.update(walletsTable).set({ balance: wallet.balance + ch.stake }).where(eq(walletsTable.userId, p.userId));
-              await db.insert(transactionsTable).values({
-                id: genId("tx"), userId: p.userId, type: "challenge_win",
-                amount: ch.stake, description: `Cooperative challenge success: ${ch.title}`,
-              });
-            }
-          }
+      // Cooperative: every participant must individually meet the target
+      const cooperativeSuccess = participants.every((p) => p.focusMinutes >= targetMinutes);
+      if (cooperativeSuccess && ch.stake > 0) {
+        for (const p of participants) {
+          await db.update(walletsTable)
+            .set({ balance: sql`${walletsTable.balance} + ${ch.stake}` })
+            .where(eq(walletsTable.userId, p.userId));
+          await db.insert(transactionsTable).values({
+            id: genId("tx"), userId: p.userId, type: "challenge_win",
+            amount: ch.stake, description: `Cooperative challenge success: ${ch.title}`,
+          });
         }
         winnerId = "cooperative_success";
       }
     }
 
-    await db.update(challengesTable)
-      .set({ status: "completed", winnerId, endTime: now })
-      .where(eq(challengesTable.id, ch.id));
+    if (winnerId !== null) {
+      await db.update(challengesTable)
+        .set({ winnerId })
+        .where(eq(challengesTable.id, ch.id));
+    }
 
     const participantIds = participants.map((p) => p.userId);
     void sendPushNotification(participantIds, {
@@ -220,9 +219,11 @@ router.post("/", requireVerified, async (req, res) => {
   const type  = challengeType === "cooperative" ? "cooperative" : "competitive";
 
   if (fee > 0) {
-    const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, userId)).limit(1);
-    if (!wallet || wallet.balance < fee) return res.status(400).json({ error: "Insufficient coins for entry fee" });
-    await db.update(walletsTable).set({ balance: wallet.balance - fee }).where(eq(walletsTable.userId, userId));
+    const [deducted] = await db.update(walletsTable)
+      .set({ balance: sql`${walletsTable.balance} - ${fee}` })
+      .where(and(eq(walletsTable.userId, userId), gte(walletsTable.balance, fee)))
+      .returning({ balance: walletsTable.balance });
+    if (!deducted) return res.status(400).json({ error: "Insufficient coins for entry fee" });
     await db.insert(transactionsTable).values({
       id: genId("tx"), userId, type: "challenge_stake",
       amount: -fee, description: `Entry fee for challenge: ${title}`,
@@ -271,9 +272,11 @@ router.post("/:id/join", requireVerified, async (req, res) => {
   if (existing.length > 0) return res.status(409).json({ error: "Already joined" });
 
   if (ch.stake > 0) {
-    const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, userId)).limit(1);
-    if (!wallet || wallet.balance < ch.stake) return res.status(400).json({ error: "Insufficient coins" });
-    await db.update(walletsTable).set({ balance: wallet.balance - ch.stake }).where(eq(walletsTable.userId, userId));
+    const [deducted] = await db.update(walletsTable)
+      .set({ balance: sql`${walletsTable.balance} - ${ch.stake}` })
+      .where(and(eq(walletsTable.userId, userId), gte(walletsTable.balance, ch.stake)))
+      .returning({ balance: walletsTable.balance });
+    if (!deducted) return res.status(400).json({ error: "Insufficient coins" });
     await db.insert(transactionsTable).values({
       id: genId("tx"), userId, type: "challenge_stake",
       amount: -ch.stake, description: `Joined challenge: ${ch.title}`,

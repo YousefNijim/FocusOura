@@ -201,6 +201,12 @@ router.post("/", requireVerified, async (req, res) => {
     return;
   }
 
+  const VALID_SESSION_TYPES = ["routine", "homework", "deep_focus"];
+  if (!VALID_SESSION_TYPES.includes(sessionType)) {
+    res.status(400).json({ error: "sessionType must be 'routine', 'homework', or 'deep_focus'" });
+    return;
+  }
+
   let resolvedSubjectId: string | null = null;
   let subjectName = "General";
   let subjectPlantId: string | null = null;
@@ -230,11 +236,26 @@ router.post("/", requireVerified, async (req, res) => {
 
   const sessionId = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
+  // Verify calendar item ownership before linking — prevents linking or auto-completing another user's item
+  let verifiedCalendarItemId: string | null = null;
+  let calendarItemTitle: string | null = null;
+  if (calendarItemId) {
+    const [calItem] = await db
+      .select({ title: calendarItemsTable.title })
+      .from(calendarItemsTable)
+      .where(and(eq(calendarItemsTable.id, calendarItemId), eq(calendarItemsTable.userId, userId)))
+      .limit(1);
+    if (calItem) {
+      verifiedCalendarItemId = calendarItemId;
+      calendarItemTitle = calItem.title;
+    }
+  }
+
   await db.insert(sessionsTable).values({
     id: sessionId,
     userId,
     subjectId: resolvedSubjectId,
-    calendarItemId: calendarItemId || null,
+    calendarItemId: verifiedCalendarItemId,
     plantId: resolvedPlantId,
     sessionType,
     state: "started",
@@ -251,16 +272,6 @@ router.post("/", requireVerified, async (req, res) => {
     metadata: { sessionType, plantType },
   });
 
-  let calendarItemTitle: string | null = null;
-  if (calendarItemId) {
-    const [calItem] = await db
-      .select({ title: calendarItemsTable.title })
-      .from(calendarItemsTable)
-      .where(eq(calendarItemsTable.id, calendarItemId))
-      .limit(1);
-    calendarItemTitle = calItem?.title ?? null;
-  }
-
   res.status(201).json({
     id: sessionId,
     subjectId: resolvedSubjectId,
@@ -272,7 +283,7 @@ router.post("/", requireVerified, async (req, res) => {
     endTime: null,
     durationMinutes,
     pointsEarned: 0,
-    calendarItemId: calendarItemId || null,
+    calendarItemId: verifiedCalendarItemId,
     calendarItemTitle,
     createdAt: new Date().toISOString(),
   });
@@ -381,6 +392,11 @@ router.put("/:sessionId", async (req, res) => {
   const { sessionId } = req.params;
   const { state, actualMinutes: rawActualMinutes } = req.body;
 
+  if (state !== "completed" && state !== "aborted") {
+    res.status(400).json({ error: "state must be 'completed' or 'aborted'" });
+    return;
+  }
+
   const existing = await db
     .select()
     .from(sessionsTable)
@@ -393,6 +409,12 @@ router.put("/:sessionId", async (req, res) => {
   }
 
   const session = existing[0];
+
+  if (session.state === "completed" || session.state === "aborted") {
+    res.status(409).json({ error: "Session already finished" });
+    return;
+  }
+
   const endTime = new Date();
 
   const actualMinutes = rawActualMinutes ?? session.durationMinutes;
@@ -446,18 +468,10 @@ router.put("/:sessionId", async (req, res) => {
       }
     }
 
-    const wallet = await db
-      .select()
-      .from(walletsTable)
-      .where(eq(walletsTable.userId, userId))
-      .limit(1);
-
-    if (wallet.length) {
-      await db
-        .update(walletsTable)
-        .set({ balance: (wallet[0].balance ?? 0) + pointsEarned, lastUpdated: new Date() })
-        .where(eq(walletsTable.userId, userId));
-    }
+    await db
+      .update(walletsTable)
+      .set({ balance: sql`${walletsTable.balance} + ${pointsEarned}`, lastUpdated: new Date() })
+      .where(eq(walletsTable.userId, userId));
 
       await db.insert(transactionsTable).values({
         id: `txn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -596,6 +610,17 @@ router.post("/:sessionId/events", async (req, res) => {
   const userId = getUserId(req);
   const { sessionId } = req.params;
   const { eventType, metadata } = req.body;
+
+  const [owned] = await db
+    .select({ id: sessionsTable.id })
+    .from(sessionsTable)
+    .where(and(eq(sessionsTable.id, sessionId), eq(sessionsTable.userId, userId)))
+    .limit(1);
+
+  if (!owned) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
 
   const eventId = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 

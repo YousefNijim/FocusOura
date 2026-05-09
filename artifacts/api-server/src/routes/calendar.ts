@@ -39,6 +39,9 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Title and due date are required" });
   }
 
+  const VALID_TYPES = ["homework", "exam", "other"];
+  const normalizedType = VALID_TYPES.includes(type) ? type : "homework";
+
   const [item] = await db
     .insert(calendarItemsTable)
     .values({
@@ -46,12 +49,12 @@ router.post("/", async (req, res) => {
       userId,
       subjectId: subjectId === "general" ? null : subjectId,
       title,
-      type: type || "homework",
+      type: normalizedType,
       dueDate: new Date(dueDate),
     })
     .returning();
 
-  res.status(201).json(item);
+  return res.status(201).json(item);
 });
 
 router.patch("/:id", async (req, res) => {
@@ -73,14 +76,14 @@ router.patch("/:id", async (req, res) => {
     .returning();
 
   if (!updated) return res.status(404).json({ error: "Item not found" });
-  res.json(updated);
+  return res.json(updated);
 });
 
 router.delete("/:id", async (req, res) => {
   const userId = getUserId(req);
   const { id } = req.params;
 
-  const result = await db
+  await db
     .delete(calendarItemsTable)
     .where(and(eq(calendarItemsTable.id, id), eq(calendarItemsTable.userId, userId)));
 

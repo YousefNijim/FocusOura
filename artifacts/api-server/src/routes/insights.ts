@@ -7,6 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { getUserId } from "./users.js";
+import { logger } from "../lib/logger.js";
 import { ai } from "@workspace/integrations-gemini-ai";
 
 const router: IRouter = Router();
@@ -117,7 +118,8 @@ Be warm, human, and concise. Do not use generic phrases.`;
     } else {
       insightType = "warning";
     }
-  } catch {
+  } catch (err) {
+    logger.warn({ msg: "Gemini AI call failed — using fallback insight", error: err instanceof Error ? err.message : String(err) });
     const fallbacks: Record<string, string> = {
       routine: "Great job showing up for your routine study session! Consistency is the key to mastery.",
       homework: "You tackled your homework with focus. Each assignment completed is progress made!",
