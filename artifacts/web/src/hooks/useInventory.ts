@@ -5,10 +5,10 @@ export type StoreItem = {
   id: string;
   name: string;
   description: string;
-  category: "avatar_frame" | "focus_bg" | "pet_outfit";
+  category: "avatar_frame" | "focus_background" | "pet_outfit";
   price: number;
   icon: string;
-  rarity: "common" | "rare" | "epic";
+  rarity: "common" | "rare" | "epic" | "legendary";
   colorValue: string | null;
   owned: boolean;
   equipped: boolean;
@@ -47,7 +47,7 @@ export function useInventory() {
       setInventory(data);
       setEquipped({
         avatar_frame: data.find((i) => i.category === "avatar_frame" && i.equipped) ?? null,
-        focus_bg: data.find((i) => i.category === "focus_bg" && i.equipped) ?? null,
+        focus_bg: data.find((i) => i.category === "focus_background" && i.equipped) ?? null,
         pet_outfit: data.find((i) => i.category === "pet_outfit" && i.equipped) ?? null,
       });
     } catch {

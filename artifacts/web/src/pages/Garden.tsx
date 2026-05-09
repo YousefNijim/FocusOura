@@ -586,7 +586,7 @@ export default function Garden() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-foreground truncate capitalize">
-                            {subject?.name || "Unknown"}
+                            {subject?.name || "General"}
                           </p>
                           <p className="text-[10px] text-muted-foreground capitalize">Lvl {plant.growthLevel} · {(plant as any).plantType ?? "fern"}</p>
                           <div className="mt-1 w-full bg-muted rounded-full h-1.5">

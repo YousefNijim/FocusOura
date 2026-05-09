@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { subjectsTable, plantsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { getUserId, ensureUser } from "./users.js";
-import { requireVerified } from "../middleware/requireVerified.js";
+import { requireVerifiedOrOnboarding } from "../middleware/requireVerified.js";
 
 const router: IRouter = Router();
 
@@ -31,7 +31,7 @@ router.get("/", async (req, res) => {
   );
 });
 
-router.post("/", requireVerified, async (req, res) => {
+router.post("/", requireVerifiedOrOnboarding, async (req, res) => {
   const userId = getUserId(req);
   await ensureUser(userId);
 

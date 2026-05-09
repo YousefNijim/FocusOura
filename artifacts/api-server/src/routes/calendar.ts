@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { calendarItemsTable, subjectsTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
 import { getUserId } from "./users.js";
+import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 
@@ -12,23 +13,27 @@ function genId(prefix: string) {
 
 router.get("/", async (req, res) => {
   const userId = getUserId(req);
-  const items = await db
-    .select({
-      id: calendarItemsTable.id,
-      title: calendarItemsTable.title,
-      type: calendarItemsTable.type,
-      dueDate: calendarItemsTable.dueDate,
-      completed: calendarItemsTable.completed,
-      subjectId: calendarItemsTable.subjectId,
-      subjectName: subjectsTable.name,
-      accentColor: subjectsTable.accentColor,
-    })
-    .from(calendarItemsTable)
-    .leftJoin(subjectsTable, eq(calendarItemsTable.subjectId, subjectsTable.id))
-    .where(eq(calendarItemsTable.userId, userId))
-    .orderBy(asc(calendarItemsTable.dueDate));
-
-  res.json(items);
+  try {
+    const items = await db
+      .select({
+        id: calendarItemsTable.id,
+        title: calendarItemsTable.title,
+        type: calendarItemsTable.type,
+        dueDate: calendarItemsTable.dueDate,
+        completed: calendarItemsTable.completed,
+        subjectId: calendarItemsTable.subjectId,
+        subjectName: subjectsTable.name,
+        accentColor: subjectsTable.accentColor,
+      })
+      .from(calendarItemsTable)
+      .leftJoin(subjectsTable, eq(calendarItemsTable.subjectId, subjectsTable.id))
+      .where(eq(calendarItemsTable.userId, userId))
+      .orderBy(asc(calendarItemsTable.dueDate));
+    res.json(items);
+  } catch (err) {
+    logger.error({ msg: "GET /calendar failed", error: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({ error: "Failed to load calendar items" });
+  }
 });
 
 router.post("/", async (req, res) => {

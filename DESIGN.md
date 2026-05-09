@@ -1377,3 +1377,201 @@ Defined relative to `--radius: 1rem` (16px):
 | No FK `.references()` in Drizzle schema | Orphaned rows if deletes aren't done in correct order | Add `.references()` with `onDelete: 'cascade'` where appropriate |
 | `GET /analytics` loads all sessions | Full table scan grows unbounded | Replace with SQL `SUM`/`COUNT` aggregation query |
 | `aiInsights` table has no index on `sessionId` | Slow lookup when insight table grows | Add `index("ai_insights_session_idx").on(aiInsightsTable.sessionId)` to schema |
+
+---
+
+## 11. UI Audit (2026-05-09)
+
+### Part 1 — Visual Consistency
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| Tailwind token usage in app pages | ✅ | `text-foreground`, `bg-muted`, `text-primary` etc. used correctly |
+| Auth pages use raw CSS variables | ⚠️ | Login, Register, ForgotPassword, ResetPassword, VerifyEmail use `var(--color-*)` — consistent with each other but different from app pages |
+| `--color-primary-dark` defined | ❌→✅ | Used in 7 files, never defined — hover had no effect. **Fixed**: added to `index.css` `@theme inline`, `:root`, and `.dark` |
+| Dark mode on auth success/error banners | ⚠️ | `bg-green-50 text-green-700` / `bg-red-50 text-red-600` banners have no `dark:` variants — not fixed (auth page pattern is established) |
+| Rarity badge for `legendary` items | ❌→✅ | `RARITY_COLORS` lacked `legendary` key — badges rendered with `class="undefined"`. **Fixed**: added yellow styling |
+| Loading states | ✅ | All major pages have spinners or skeleton loaders |
+| Empty states | ✅ | Store, Garden, Calendar, Analytics all have meaningful empty states |
+| Error states | ⚠️→✅ | Analytics swallowed API errors silently. **Fixed**: now shows distinct error message |
+
+### Part 2 — Component Functionality
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| FocusSession timer | ✅ | Countdown math correct, pause/resume correct, auto-complete at 0 |
+| FocusSession deep focus lock | ✅ | `beforeunload` + `popstate` blocked; properly cleaned up |
+| FocusSession motivation message | ✅ | `refetchMotivation()` called on session start |
+| Garden — subject label on plants | ❌→✅ | Plants without a subject showed "Unknown". **Fixed**: now shows "General" |
+| Garden — add subject button hover | ⚠️ | `hover:bg-[var(--color-primary-dark)]` — now defined and works after Fix #7 |
+| Store — Focus Backgrounds tab | ❌→✅ | Tab permanently empty: frontend filtered `"focus_bg"` but backend stores `"focus_background"`. **Fixed** |
+| Store — equipped focus background detection | ❌→✅ | `useInventory` compared `category === "focus_bg"` against API value `"focus_background"`. **Fixed** |
+| Store — legendary rarity badge | ❌→✅ | `RARITY_COLORS["legendary"]` was undefined. **Fixed** |
+| CalendarSection — delete button icon | ❌→✅ | Used `MoreVertical` (ambiguous) on a destructive action. **Fixed**: replaced with `Trash2` |
+| Analytics — API error state | ❌→✅ | Catch block was empty; error and "no data" looked identical. **Fixed** |
+| Onboarding flow | ✅ | StepOne→StepTwo→StepThree, plant selection, subject creation, confetti all correct |
+| Admin panel | ✅ | Guard redirect, message moderation, user management all work |
+| Profile | ⚠️ | `hover:bg-red-50` / `hover:bg-yellow-50` on menu items have no `dark:` variants — LOW, not fixed |
+| VerifyEmail — cooldown leak | ❌→✅ | Cooldown interval not cleared on unmount. **Fixed**: added cleanup `useEffect` |
+| BottomNav deep focus lock | ✅ | Modal shown before nav away during deep focus session |
+| Active session bar | ✅ | Appears on all non-focus pages when session running; `pt-16` offset prevents overlap |
+
+### Part 3 — Error States
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| Network error on store load | ✅ | Shows "Store unavailable" + retry button |
+| Network error on analytics | ❌→✅ | Was indistinguishable from "no data". **Fixed** |
+| JWT expiry | ✅ | `fetchApi` throws on 401; AuthContext catches and redirects to `/login` |
+| Calendar add failure | ✅ | `addMutation` error surface via toast |
+| Session start/pause/resume failure | ✅ | All revert optimistic state on error |
+| Form validation (Register, ResetPassword) | ✅ | Client-side and server-side errors both displayed |
+| Password reset token expired | ✅ | `isExpiredError` check links back to `/forgot-password` |
+| Email verify token expired | ✅ | Shows resend button with 60s cooldown |
+
+### Part 4 — Mobile Viewport (390px)
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| Bottom nav clearance | ✅ | `pb-28` on all page content |
+| Active session bar offset | ✅ | `pt-16` added when bar is visible |
+| Store 2-column grid | ✅ | `grid-cols-2 gap-3` fits 390px without overflow |
+| Calendar section | ✅ | Single-column, touch targets ≥44px |
+| Focus session timer | ✅ | Large centered text, full-width buttons |
+| Onboarding plant grid | ✅ | `grid-cols-4 gap-2` — plants are 48px, fits 390px |
+| Category tabs on store | ✅ | `flex-1` equal thirds; wrapping doesn't occur |
+
+### Part 5 — Hooks Audit
+
+| Hook | Status | Notes |
+|------|--------|-------|
+| `useAmbientSound` | ✅ | Web Audio API synthesis, proper `stopEngine()` on unmount |
+| `useMotivationMessage` | ✅ | `staleTime: Infinity`, manual `refetch` on session start |
+| `useInventory` — category comparison | ❌→✅ | `"focus_bg"` vs `"focus_background"` mismatch. **Fixed** |
+| `SessionContext` timer | ✅ | No memory leaks; visibility-change catch-up correct |
+| `VerifyEmail` cooldown interval | ❌→✅ | Leaked on unmount. **Fixed** |
+
+### Bug List
+
+| # | Severity | File | Bug | Fix Applied |
+|---|----------|------|-----|-------------|
+| 1 | CRITICAL | `Store.tsx` | Focus Backgrounds tab always empty — `"focus_bg"` vs `"focus_background"` category mismatch | ✅ Fixed |
+| 2 | CRITICAL | `useInventory.ts` | Equipped focus background never detected — same category mismatch | ✅ Fixed |
+| 3 | HIGH | `Store.tsx` + `useInventory.ts` | `StoreItem.rarity` type missing `"legendary"`; badge renders `class="undefined"` | ✅ Fixed |
+| 4 | MEDIUM | `Garden.tsx` | Plants without a subject show "Unknown" instead of "General" | ✅ Fixed |
+| 5 | LOW | `CalendarSection.tsx` | Delete button uses `MoreVertical` icon (ambiguous) on a destructive action | ✅ Fixed |
+| 6 | LOW | `Analytics.tsx` | API error silently swallowed; error and "no data" states look identical | ✅ Fixed |
+| 7 | LOW | `index.css` | `--color-primary-dark` referenced in 7 files but never defined — hover effect is a no-op | ✅ Fixed |
+| 8 | LOW | `VerifyEmail.tsx` | Cooldown `setInterval` not cleared on component unmount | ✅ Fixed |
+
+---
+
+## 12. Production Error Fixes (2026-05-09)
+
+### Error 1 — POST /subjects → 403 during onboarding
+
+**Root cause**: `requireVerified` middleware on `POST /subjects` blocks new users who haven't verified their email. Onboarding runs *before* the user can verify email (they just registered), creating an impossible chicken-and-egg situation.
+
+**Fix applied**: Added `requireVerifiedOrOnboarding` middleware to `middleware/requireVerified.ts`. The new middleware fetches both `emailVerified` and `onboardingCompleted`. If `onboardingCompleted` is `false`, the user is in onboarding and the request is allowed through. If onboarding is complete but email is unverified, it returns 403. Applied to `POST /subjects` in `subjects.ts`.
+
+**Why Option A over Option B**: Backend-only change; no frontend edits required. The invariant "verification is only required for post-onboarding writes" is correctly encoded at the middleware layer.
+
+### Error 2 — GET /calendar → 500
+
+**Root cause (most likely)**: The `calendar_items` table does not exist in the production Railway database. It was added to the schema after initial deployment. Any DB error previously crashed as a raw unhandled promise rejection → opaque 500.
+
+**Fix applied**: Added try/catch + `logger.error` to `GET /calendar` handler in `calendar.ts`. The error is now logged with full detail and the response returns `{ error: "Failed to load calendar items" }` instead of a silent 500.
+
+**Pending**: The migration SQL below must be run on the Railway database to create the missing table and columns.
+
+### Error 3 — HEAD /api/ → 404
+
+**Root cause**: `health.ts` only had `GET /healthz`. The frontend polled `HEAD /api/` which has no matching route.
+
+**Fix applied**: Added `GET /health` (returns `{ status: "ok", timestamp }`) and `HEAD /` (returns 200) to `health.ts`. Both are mounted at `/api/` via the existing router.
+
+### Error 4 — Cross-Origin-Opener-Policy blocks Google OAuth popup
+
+**Root cause**: Vercel may apply `Cross-Origin-Opener-Policy: same-origin` by default, which prevents `popup.closed` from being read by the parent page — breaking Firebase's `signInWithPopup` handshake.
+
+**Fix applied**: Added `Cross-Origin-Opener-Policy: unsafe-none` header to all routes in both `vercel.json` (root) and `artifacts/web/vercel.json`. Takes effect on next Vercel deployment.
+
+---
+
+### Migration SQL — Run on Railway PostgreSQL
+
+> ⚠️ Run these statements in your Railway database console or via `psql`. All use `IF NOT EXISTS` — safe to run multiple times.
+
+```sql
+-- ── 1. Users: new columns ────────────────────────────────────────
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "user_code"             integer;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "onboarding_completed"  boolean NOT NULL DEFAULT false;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verified"        boolean NOT NULL DEFAULT false;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verified_at"     timestamp;
+
+CREATE UNIQUE INDEX IF NOT EXISTS "users_user_code_key" ON "users" ("user_code");
+
+-- ── 2. Sessions: pause + calendar columns ────────────────────────
+ALTER TABLE "sessions" ADD COLUMN IF NOT EXISTS "calendar_item_id" text;
+ALTER TABLE "sessions" ADD COLUMN IF NOT EXISTS "paused_at"        timestamp;
+ALTER TABLE "sessions" ADD COLUMN IF NOT EXISTS "total_paused_ms"  integer NOT NULL DEFAULT 0;
+ALTER TABLE "sessions" ADD COLUMN IF NOT EXISTS "pause_count"      integer NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS "sessions_calendar_item_id_idx" ON "sessions" ("calendar_item_id");
+
+-- ── 3. calendar_items table ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS "calendar_items" (
+  "id"         text      PRIMARY KEY,
+  "user_id"    text      NOT NULL,
+  "subject_id" text,
+  "title"      text      NOT NULL,
+  "type"       text      NOT NULL DEFAULT 'homework',
+  "due_date"   timestamp NOT NULL,
+  "completed"  boolean   NOT NULL DEFAULT false,
+  "created_at" timestamp NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS "calendar_user_id_idx"    ON "calendar_items" ("user_id");
+CREATE INDEX IF NOT EXISTS "calendar_subject_id_idx" ON "calendar_items" ("subject_id");
+CREATE INDEX IF NOT EXISTS "calendar_due_date_idx"   ON "calendar_items" ("due_date");
+
+-- ── 4. push_tokens table ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS "push_tokens" (
+  "id"         text      PRIMARY KEY,
+  "user_id"    text      NOT NULL,
+  "token"      text      NOT NULL,
+  "device_id"  text,
+  "platform"   text,
+  "created_at" timestamp NOT NULL DEFAULT now(),
+  "last_used"  timestamp
+);
+
+CREATE INDEX        IF NOT EXISTS "push_tokens_user_id_idx"    ON "push_tokens" ("user_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "push_tokens_user_token_idx" ON "push_tokens" ("user_id", "token");
+
+-- ── 5. password_reset_tokens table ──────────────────────────────
+CREATE TABLE IF NOT EXISTS "password_reset_tokens" (
+  "id"         text      PRIMARY KEY,
+  "user_id"    text      NOT NULL,
+  "token_hash" text      NOT NULL UNIQUE,
+  "expires_at" timestamp NOT NULL,
+  "used_at"    timestamp,
+  "created_at" timestamp NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS "prt_token_hash_idx" ON "password_reset_tokens" ("token_hash");
+CREATE INDEX IF NOT EXISTS "prt_user_id_idx"    ON "password_reset_tokens" ("user_id");
+
+-- ── 6. email_verification_tokens table ──────────────────────────
+CREATE TABLE IF NOT EXISTS "email_verification_tokens" (
+  "id"         text      PRIMARY KEY,
+  "user_id"    text      NOT NULL,
+  "token_hash" text      NOT NULL UNIQUE,
+  "expires_at" timestamp NOT NULL,
+  "used_at"    timestamp,
+  "created_at" timestamp NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS "evt_token_hash_idx" ON "email_verification_tokens" ("token_hash");
+CREATE INDEX IF NOT EXISTS "evt_user_id_idx"    ON "email_verification_tokens" ("user_id");
+```

@@ -44,13 +44,14 @@ function shortDay(dateStr: string): string {
 
 export default function Analytics() {
   const navigate = useNavigate();
-  const [data, setData]     = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData]       = useState<AnalyticsData | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     fetchApi<AnalyticsData>("/analytics")
       .then(setData)
-      .catch(() => {})
+      .catch(() => setHasError(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -77,6 +78,10 @@ export default function Analytics() {
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="glass rounded-2xl h-24 animate-pulse" />
             ))}
+          </div>
+        ) : hasError ? (
+          <div className="glass rounded-2xl p-8 text-center">
+            <p className="text-muted-foreground text-sm">Failed to load analytics. Check your connection and try again.</p>
           </div>
         ) : !data ? (
           <div className="glass rounded-2xl p-8 text-center">

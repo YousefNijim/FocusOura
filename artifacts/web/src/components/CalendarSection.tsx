@@ -2,13 +2,13 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { fetchApi } from "@/utils/api";
-import { 
-  Calendar as CalendarIcon, 
-  Plus, 
-  CheckCircle2, 
-  Circle, 
-  Clock, 
-  MoreVertical,
+import {
+  Calendar as CalendarIcon,
+  Plus,
+  CheckCircle2,
+  Circle,
+  Clock,
+  Trash2,
   ChevronRight,
   BookOpen,
   GraduationCap
@@ -252,7 +252,7 @@ export function CalendarSection() {
                 }}
                 className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-muted-foreground transition-all"
               >
-                <MoreVertical size={14} />
+                <Trash2 size={14} />
               </button>
             </div>
           ))

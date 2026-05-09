@@ -23,6 +23,10 @@ export default function VerifyEmail() {
   const called = useRef(false);
 
   useEffect(() => {
+    return () => { if (cooldownRef.current) clearInterval(cooldownRef.current); };
+  }, []);
+
+  useEffect(() => {
     if (!token || called.current) return;
     called.current = true;
 

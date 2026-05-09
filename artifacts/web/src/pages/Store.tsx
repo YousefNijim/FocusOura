@@ -6,17 +6,17 @@ import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import { useInventory, type StoreItem } from "@/hooks/useInventory";
 
-type Category = "avatar_frame" | "focus_bg" | "pet_outfit";
+type Category = "avatar_frame" | "focus_background" | "pet_outfit";
 
 const CATEGORY_LABELS: Record<Category, string> = {
   avatar_frame: "Avatar Frames",
-  focus_bg: "Focus Backgrounds",
+  focus_background: "Focus Backgrounds",
   pet_outfit: "Pet Outfits",
 };
 
 const CATEGORY_ICONS: Record<Category, React.ReactNode> = {
   avatar_frame: <Frame size={16} />,
-  focus_bg: <Palette size={16} />,
+  focus_background: <Palette size={16} />,
   pet_outfit: <Shirt size={16} />,
 };
 
@@ -24,6 +24,7 @@ const RARITY_COLORS: Record<string, string> = {
   common: "text-muted-foreground bg-muted",
   rare: "text-blue-600 bg-blue-50 dark:bg-blue-950 dark:text-blue-400",
   epic: "text-purple-600 bg-purple-50 dark:bg-purple-950 dark:text-purple-400",
+  legendary: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950 dark:text-yellow-400",
 };
 
 export default function Store() {
@@ -94,7 +95,7 @@ export default function Store() {
   };
 
   const categoryItems = items.filter((i) => i.category === activeCategory);
-  const categories: Category[] = ["avatar_frame", "focus_bg", "pet_outfit"];
+  const categories: Category[] = ["avatar_frame", "focus_background", "pet_outfit"];
 
   return (
     <MobileLayout>
@@ -151,7 +152,7 @@ export default function Store() {
             >
               <span>{CATEGORY_ICONS[cat]}</span>
               <span className="leading-none text-[10px]">
-                {cat === "avatar_frame" ? "Frames" : cat === "focus_bg" ? "Backgrounds" : "Pet Outfits"}
+                {cat === "avatar_frame" ? "Frames" : cat === "focus_background" ? "Backgrounds" : "Pet Outfits"}
               </span>
             </button>
           ))}
@@ -206,7 +207,7 @@ export default function Store() {
                   style={{
                     background: item.category === "avatar_frame" && item.colorValue
                       ? item.colorValue.includes("gradient") ? item.colorValue : `${item.colorValue}33`
-                      : item.category === "focus_bg" && item.colorValue
+                      : item.category === "focus_background" && item.colorValue
                       ? item.colorValue
                       : "var(--color-muted)",
                   }}
@@ -302,7 +303,7 @@ export default function Store() {
               style={{
                 background: previewItem.category === "avatar_frame" && previewItem.colorValue
                   ? previewItem.colorValue.includes("gradient") ? previewItem.colorValue : `${previewItem.colorValue}33`
-                  : previewItem.category === "focus_bg" && previewItem.colorValue
+                  : previewItem.category === "focus_background" && previewItem.colorValue
                   ? previewItem.colorValue
                   : "var(--color-muted)",
               }}
