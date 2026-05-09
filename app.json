@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "3a5438a6-36eb-46a1-88a6-82e4083016fa"
+      }
+    },
+    "android": {
+      "package": "com.focusoura"
+    }
+  }
+}
