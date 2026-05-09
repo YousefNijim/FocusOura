@@ -262,7 +262,7 @@ export default function Garden() {
     if (!newName.trim()) return;
     setAdding(true);
     try {
-      await fetchApi("/subjects", { method: "POST", body: JSON.stringify({ name: newName.trim(), accentColor: newColor }) });
+      await fetchApi("/subjects", { method: "POST", body: JSON.stringify({ name: newName.trim(), accentColor: newColor, plantType: "fern" }) });
       setNewName(""); setShowAdd(false);
       await refreshData();
       toast({ title: "Subject added!", description: `${newName} added to your garden.` });

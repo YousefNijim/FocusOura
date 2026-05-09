@@ -22,12 +22,22 @@ export async function requireVerified(
   }
 
   const [user] = await db
-    .select({ emailVerified: usersTable.emailVerified })
+    .select({
+      emailVerified: usersTable.emailVerified,
+      onboardingCompleted: usersTable.onboardingCompleted,
+    })
     .from(usersTable)
     .where(eq(usersTable.id, userId))
     .limit(1);
 
-  if (!user?.emailVerified) {
+  // Users who haven't finished onboarding haven't had a chance to verify their
+  // email yet — allow them through so onboarding steps can complete.
+  if (!user?.onboardingCompleted) {
+    next();
+    return;
+  }
+
+  if (!user.emailVerified) {
     res.status(403).json({
       error: "Email verification required",
       code: "EMAIL_NOT_VERIFIED",

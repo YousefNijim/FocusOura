@@ -48,6 +48,13 @@ async function sendVerificationTokenEmail(userId: string, email: string, display
 
 const router: IRouter = Router();
 
+// Allow Google OAuth popup to communicate with the opener window.
+// Without this, browsers with COOP: same-origin block window.closed checks.
+router.use((_req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
+  next();
+});
+
 function generateId() {
   return "user_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
 }

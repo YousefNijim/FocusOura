@@ -98,7 +98,7 @@ export default function Store() {
 
   return (
     <MobileLayout>
-      <div className="px-5 pt-6 space-y-5 pb-10">
+      <div className="px-5 pt-6 space-y-5 pb-28">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

@@ -8,4 +8,13 @@ router.get("/healthz", (_req, res) => {
   res.json(data);
 });
 
+router.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Frontend polls HEAD /api/ as a connectivity check
+router.head("/", (_req, res) => {
+  res.status(200).end();
+});
+
 export default router;

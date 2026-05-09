@@ -1,5 +1,78 @@
 # FocusOura — Design Document
 
+## Done (Production Bug Fixes — 2026-05-09)
+
+- **Fix: Onboarding 403** — `requireVerified` now bypasses the email-verification check when `onboarding_completed = false`. New users can create subjects and plants during onboarding before their email is verified. Once onboarding is complete the gate re-engages normally. (`middleware/requireVerified.ts`)
+- **Fix: Calendar 500** — All four calendar route handlers lacked try/catch; any DB error (most likely `calendar_items` table missing in production) produced a silent 500. Added error handling with `logger.error` on every handler so the real error message appears in Railway logs. Also fixed a latent bug where `subjectId === "general"` was checked instead of falsy — changed to `subjectId || null`. Run the migration SQL below before deploying. (`routes/calendar.ts`)
+- **Fix: Health check route** — Frontend was polling `HEAD /api/` which returned 404. Added `HEAD /` and `GET /health` to the health router. (`routes/health.ts`)
+- **Fix: COOP header for Google OAuth popup** — Added `Cross-Origin-Opener-Policy: unsafe-none` middleware on the auth router so the Google sign-in popup can communicate back to the opener window via `window.closed`. (`routes/auth.ts`)
+
+### Pending migration SQL (run on Railway Postgres before deploying)
+
+```sql
+-- Add columns that may be missing on the production users table
+ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP;
+
+-- Add columns that may be missing on the production sessions table
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS paused_at TIMESTAMP;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS total_paused_ms INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS pause_count INTEGER NOT NULL DEFAULT 0;
+
+-- Create calendar_items if it doesn't exist (most likely cause of the /calendar 500)
+CREATE TABLE IF NOT EXISTS calendar_items (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  subject_id TEXT,
+  title TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'homework',
+  due_date TIMESTAMP NOT NULL,
+  completed BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS calendar_user_id_idx ON calendar_items(user_id);
+CREATE INDEX IF NOT EXISTS calendar_subject_id_idx ON calendar_items(subject_id);
+CREATE INDEX IF NOT EXISTS calendar_due_date_idx ON calendar_items(due_date);
+
+-- Create push_tokens if it doesn't exist
+CREATE TABLE IF NOT EXISTS push_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  token TEXT NOT NULL,
+  device_id TEXT,
+  platform TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  last_used TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS push_tokens_user_id_idx ON push_tokens(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS push_tokens_user_token_idx ON push_tokens(user_id, token);
+
+-- Create password_reset_tokens if it doesn't exist
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  used_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS prt_token_hash_idx ON password_reset_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS prt_user_id_idx ON password_reset_tokens(user_id);
+
+-- Create email_verification_tokens if it doesn't exist
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  used_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS evt_token_hash_idx ON email_verification_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS evt_user_id_idx ON email_verification_tokens(user_id);
+```
+
 ## 1. Tech Stack
 
 ### Workspace

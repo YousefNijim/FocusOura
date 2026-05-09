@@ -1,9 +1,12 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { BottomNav } from "./BottomNav";
 import { useSession } from "@/context/SessionContext";
+import { useAuth } from "@/context/AuthContext";
 import { PLANT_CATALOG } from "@/constants/plants";
 import { Timer, Zap } from "lucide-react";
+
+const BANNER_DISMISSED_KEY = "focusoura_verify_banner_dismissed";
 
 interface MobileLayoutProps {
   children: ReactNode;
@@ -17,7 +20,7 @@ function formatTime(secs: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-function ActiveSessionBar() {
+function ActiveSessionBar({ bannerOffset }: { bannerOffset: boolean }) {
   const location  = useLocation();
   const navigate  = useNavigate();
   const { session, elapsedSecs, timeLeft } = useSession();
@@ -31,7 +34,7 @@ function ActiveSessionBar() {
   return (
     <button
       onClick={() => navigate("/focus")}
-      className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40 px-4 pt-2 pb-1"
+      className={`fixed left-1/2 -translate-x-1/2 w-full max-w-md z-40 px-4 pt-2 pb-1 ${bannerOffset ? "top-10" : "top-0"}`}
     >
       <div className="glass-strong rounded-2xl px-4 py-2.5 flex items-center gap-3 border border-primary/20 shadow-lg shadow-primary/10">
         <div className="relative flex-shrink-0">
@@ -64,13 +67,22 @@ function ActiveSessionBar() {
 
 export const MobileLayout = ({ children }: MobileLayoutProps) => {
   const { session } = useSession();
+  const { isAuthenticated, authUser } = useAuth();
   const location    = useLocation();
-  const showBar     = !!session && location.pathname !== "/focus";
+  const [bannerDismissed] = useState(() => sessionStorage.getItem(BANNER_DISMISSED_KEY) === "1");
+
+  const showBar    = !!session && location.pathname !== "/focus";
+  const showBanner = isAuthenticated && !!authUser && !authUser.emailVerified && !bannerDismissed;
+
+  let topPadding = "";
+  if (showBanner && showBar) topPadding = "pt-[104px]";
+  else if (showBanner)       topPadding = "pt-10";
+  else if (showBar)          topPadding = "pt-16";
 
   return (
     <div className="min-h-screen max-w-md mx-auto relative bg-background">
-      <ActiveSessionBar />
-      <main className={`pb-24 min-h-screen ${showBar ? "pt-16" : ""}`}>
+      <ActiveSessionBar bannerOffset={showBanner} />
+      <main className={`pb-24 min-h-screen ${topPadding}`}>
         {children}
       </main>
       <BottomNav />

@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { fetchApi } from "@/utils/api";
-import { 
-  Calendar as CalendarIcon, 
-  Plus, 
-  CheckCircle2, 
-  Circle, 
-  Clock, 
+import {
+  Calendar as CalendarIcon,
+  Plus,
+  CheckCircle2,
+  Circle,
+  Clock,
   MoreVertical,
+  X,
   ChevronRight,
   BookOpen,
   GraduationCap
@@ -51,6 +52,7 @@ export function CalendarSection() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({
     title: "",
     type: "homework" as const,
@@ -148,7 +150,7 @@ export function CalendarSection() {
                       <SelectValue placeholder="Select subject" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="general">General</SelectItem>
+                      <SelectItem value="">General</SelectItem>
                       {subjects.map(s => (
                         <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                       ))}
@@ -246,14 +248,29 @@ export function CalendarSection() {
                 </div>
               </div>
               
-              <button 
-                onClick={() => {
-                  if (confirm("Delete this item?")) deleteMutation.mutate(item.id);
-                }}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-muted-foreground transition-all"
-              >
-                <MoreVertical size={14} />
-              </button>
+              {deleteConfirmId === item.id ? (
+                <div className="flex gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => { deleteMutation.mutate(item.id); setDeleteConfirmId(null); }}
+                    className="px-2 py-1 rounded-lg bg-red-500/15 text-red-600 text-[10px] font-semibold hover:bg-red-500/25 transition-colors"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirmId(null)}
+                    className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setDeleteConfirmId(item.id)}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-muted-foreground transition-all"
+                >
+                  <MoreVertical size={14} />
+                </button>
+              )}
             </div>
           ))
         )}
