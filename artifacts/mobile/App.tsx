@@ -175,6 +175,27 @@ export default function App() {
           ref={webViewRef}
           source={{ uri: WEB_URL }}
           style={styles.webview}
+
+          // Cookie support — required for any future cookie-based auth or session tokens
+          sharedCookiesEnabled={true}
+          thirdPartyCookiesEnabled={true}
+
+          // Allow all origins for WebView navigation
+          originWhitelist={['*']}
+
+          // Prevent navigation away from our domain (except Google OAuth)
+          onShouldStartLoadWithRequest={(request) => {
+            const url = request.url;
+            if (url.startsWith(WEB_URL!)) return true;
+            if (url.startsWith('https://accounts.google.com')) return true;
+            if (url.startsWith('https://') && url.includes('firebaseapp.com')) return true;
+            if (url.startsWith('about:')) return true;
+            return false;
+          }}
+
+          // Keep session state across navigations (never wipe localStorage)
+          incognito={false}
+
           javaScriptEnabled={true}
           domStorageEnabled={true}
           allowsInlineMediaPlayback={true}

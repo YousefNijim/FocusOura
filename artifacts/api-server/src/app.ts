@@ -28,7 +28,49 @@ app.use(
     },
   }),
 );
-app.use(cors());
+
+const allowedOrigins = new Set<string>(
+  [
+    process.env.WEB_URL,
+    "http://localhost:3000",
+    "http://localhost:22333",
+    "http://localhost:22334",
+  ].filter(Boolean) as string[]
+);
+
+// Pre-compile preview wildcard (e.g. "https://*.vercel.app") into a regex once at startup
+const previewOriginRegex = process.env.WEB_URL_PREVIEW
+  ? new RegExp(
+      "^" +
+      process.env.WEB_URL_PREVIEW
+        .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/\*/g, "[^.]+") +
+      "$"
+    )
+  : null;
+
+function isAllowedOrigin(origin: string): boolean {
+  if (allowedOrigins.has(origin)) return true;
+  if (previewOriginRegex?.test(origin)) return true;
+  return false;
+}
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile WebView direct requests, Postman, curl)
+    if (!origin) return callback(null, true);
+    if (isAllowedOrigin(origin)) return callback(null, true);
+    logger.warn({ msg: "CORS blocked", origin });
+    callback(new Error(`CORS: ${origin} not allowed`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  exposedHeaders: ["Set-Cookie"],
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

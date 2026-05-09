@@ -803,6 +803,17 @@ Base URL: `/api`
 2. Session pause (est. 1 hour)
 3. Run migration: `ALTER TABLE users ADD COLUMN onboarding_completed BOOLEAN NOT NULL DEFAULT false;`
 
+## Session Log - 2026-05-09
+
+### Completed
+- Fix: Mobile APK auth — CORS configured for Vercel+Railway with origin allowlist (`WEB_URL`, `WEB_URL_PREVIEW`), preview wildcard regex, `credentials: true`, explicit methods/headers; `app.ts` replaced bare `cors()` with `corsOptions`
+- Fix: `VITE_API_BASE_URL` documented in `.env.example` as REQUIRED on Vercel — root cause of 405 errors on login/register (calls were hitting Vercel static server instead of Railway API)
+- Fix: WebView `sharedCookiesEnabled`+`thirdPartyCookiesEnabled` added to `App.tsx`; `originWhitelist={['*']}` set; `onShouldStartLoadWithRequest` added to allow own domain + Google OAuth; `incognito={false}` set
+- Fix: `FRONTEND_URL`, `WEB_URL`, `WEB_URL_PREVIEW` added to `.env.example` with production-correct values
+
+### Root Cause
+`VITE_API_BASE_URL` was missing from Vercel environment variables. Since it's a Vite build-time variable, its absence bakes in an empty string, making all `fetchApi()` calls relative (`/api/...`). Vercel serves a static site with no `/api` backend — it returns HTTP 405 on POST. The Railway API is never reached.
+
 ---
 
 ## Notes
