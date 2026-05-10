@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Eye, EyeOff, Leaf } from "lucide-react";
-import { signInWithGoogle } from "@/lib/firebase";
+import { signInWithGoogle, getGoogleRedirectResult } from "@/lib/firebase";
 import { API_BASE } from "@/utils/api";
 
 
@@ -20,6 +20,23 @@ export default function Login() {
   useEffect(() => {
     if (isAuthenticated) navigate("/", { replace: true });
   }, [isAuthenticated, navigate]);
+
+  // Pick up the result after signInWithRedirect() returns from Google
+  useEffect(() => {
+    getGoogleRedirectResult()
+      .then(async (idToken) => {
+        if (idToken) {
+          setGoogleLoading(true);
+          await loginWithGoogle(idToken);
+          navigate("/", { replace: true });
+        }
+      })
+      .catch((e: any) => {
+        if (!e.message?.includes("not configured")) {
+          setError(e.message || "Google sign-in failed. Please try again.");
+        }
+      });
+  }, []);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/config/firebase`)
@@ -47,11 +64,14 @@ export default function Login() {
     setGoogleLoading(true);
     try {
       const idToken = await signInWithGoogle();
-      await loginWithGoogle(idToken);
-      navigate("/", { replace: true });
+      if (idToken) {
+        // Popup flow — result available immediately
+        await loginWithGoogle(idToken);
+        navigate("/", { replace: true });
+      }
+      // Redirect flow — page navigates away; result handled in useEffect on return
     } catch (e: any) {
       setError(e.message || "Google login failed. Please try again.");
-    } finally {
       setGoogleLoading(false);
     }
   }

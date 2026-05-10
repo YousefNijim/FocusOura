@@ -1636,3 +1636,22 @@ CREATE INDEX IF NOT EXISTS "calendar_due_date_idx"   ON "calendar_items" ("due_d
 | `RESEND_API_KEY` | Your key from resend.com/api-keys |
 | `FROM_EMAIL` | `Focusoura <noreply@yourdomain.com>` (domain must be verified in Resend) |
 | `APP_URL` | `https://focusoura.vercel.app` (already set if friend links work) |
+
+## 15. Google OAuth in Mobile WebView (2026-05-10)
+
+**Done**: Fix: Google OAuth in mobile WebView — `signInWithRedirect()` for WebView, `signInWithPopup()` for desktop. `getRedirectResult()` handles return flow.
+
+### Problem
+`signInWithPopup()` fails inside Android/iOS WebViews with `auth/popup-closed-by-user` — Google blocks OAuth popups in embedded browsers.
+
+### Changes
+- `artifacts/web/src/lib/environment.ts` — new file: `isWebView()` detects Android WV flag, iOS without Safari, Expo, `ReactNativeWebView` global; `isMobile()` for UA-based mobile detection.
+- `artifacts/web/src/lib/firebase.ts` — `signInWithGoogle()` now branches: `signInWithRedirect()` in WebView (returns null, page navigates away), `signInWithPopup()` on desktop (returns ID token). Added `getGoogleRedirectResult()` export — call on every page load to pick up the pending redirect result.
+- `artifacts/web/src/pages/Login.tsx` — added `useEffect` on mount that calls `getGoogleRedirectResult()` and, if a token is returned, calls `loginWithGoogle()` + navigates. `handleGoogleLogin` guards the null return from the redirect path.
+- `artifacts/mobile/App.tsx` — added `oauth2.googleapis.com` and `www.googleapis.com` to `onShouldStartLoadWithRequest` allowlist; added explicit `/__/auth/` check; added `javaScriptCanOpenWindowsAutomatically={false}`.
+
+### Firebase / Google Cloud Console changes required
+- **Firebase Console** → Authentication → Sign-in method → Google → Authorized domains: confirm `focusoura.vercel.app` is listed.
+- **Google Cloud Console** → APIs → Credentials → OAuth 2.0 Client → Authorized redirect URIs must include:
+  - `https://focusoura.vercel.app/__/auth/handler`
+  - `https://focusoura-99dae.firebaseapp.com/__/auth/handler`

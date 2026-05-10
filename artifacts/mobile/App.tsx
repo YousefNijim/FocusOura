@@ -188,7 +188,10 @@ export default function App() {
             const url = request.url;
             if (url.startsWith(WEB_URL!)) return true;
             if (url.startsWith('https://accounts.google.com')) return true;
-            if (url.startsWith('https://') && url.includes('firebaseapp.com')) return true;
+            if (url.startsWith('https://oauth2.googleapis.com')) return true;
+            if (url.startsWith('https://www.googleapis.com')) return true;
+            if (url.includes('firebaseapp.com')) return true;
+            if (url.includes('/__/auth/')) return true;
             if (url.startsWith('about:')) return true;
             return false;
           }}
@@ -197,6 +200,7 @@ export default function App() {
           incognito={false}
 
           javaScriptEnabled={true}
+          javaScriptCanOpenWindowsAutomatically={false}
           domStorageEnabled={true}
           allowsInlineMediaPlayback={true}
           mediaPlaybackRequiresUserAction={false}
