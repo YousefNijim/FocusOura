@@ -8,7 +8,7 @@ import {
 import { eq, or, and, isNull, gte, sql } from "drizzle-orm";
 import { createToken } from "../middleware/auth.js";
 import { logger } from "../lib/logger.js";
-import { sendEmail, sendVerificationEmail } from "../lib/email.js";
+import { sendVerificationEmail, sendPasswordResetEmail } from "../lib/email.js";
 import { recordPasswordReset } from "../lib/sessionInvalidation.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthRequest } from "../middleware/auth.js";
@@ -40,10 +40,7 @@ async function sendVerificationTokenEmail(userId: string, email: string, display
     expiresAt,
   });
 
-  const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:22334";
-  const verifyLink  = `${frontendUrl}/verify-email?token=${rawToken}`;
-
-  await sendVerificationEmail({ to: email, displayName, verifyLink });
+  await sendVerificationEmail(email, displayName, rawToken);
 }
 
 const router: IRouter = Router();
@@ -318,25 +315,7 @@ router.post("/forgot-password", async (req, res) => {
       expiresAt,
     });
 
-    const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:22334";
-    const resetLink   = `${frontendUrl}/reset-password?token=${rawToken}`;
-
-    await sendEmail({
-      to:      user.email,
-      subject: "Reset your Focusoura password",
-      text: [
-        `Hi ${user.displayName},`,
-        "",
-        "You requested a password reset for your Focusoura account.",
-        "Click the link below to set a new password.",
-        "This link expires in 1 hour.",
-        "",
-        resetLink,
-        "",
-        "If you did not request this, ignore this email.",
-        "Your password will not change.",
-      ].join("\n"),
-    });
+    await sendPasswordResetEmail(user.email, user.displayName, rawToken);
 
     return res.json(SAFE_RESPONSE);
   } catch (err) {

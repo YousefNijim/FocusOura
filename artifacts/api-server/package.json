@@ -15,16 +15,17 @@
     "@workspace/db": "workspace:*",
     "@workspace/integrations-gemini-ai": "workspace:*",
     "bcryptjs": "^3.0.3",
-    "expo-server-sdk": "^3.10.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2",
     "drizzle-orm": "catalog:",
+    "expo-server-sdk": "^3.10.0",
     "express": "^5",
     "jsonwebtoken": "^9.0.3",
     "p-limit": "^7.3.0",
     "p-retry": "^7.1.1",
     "pino": "^9",
-    "pino-http": "^10"
+    "pino-http": "^10",
+    "resend": "^6.12.3"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",

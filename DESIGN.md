@@ -937,7 +937,9 @@ Base URL: `/api`
 | `LOG_LEVEL` | Pino log level (default: info) |
 | `FIREBASE_PROJECT_ID` | Firebase project (default: focusoura-99dae) |
 | `VITE_API_BASE_URL` | API base URL for web app (empty = Vite proxy) |
-| `APP_URL` / `REPLIT_DEV_DOMAIN` | Base URL for friend invite links |
+| `APP_URL` / `REPLIT_DEV_DOMAIN` | Base URL for friend invite links and email links |
+| `RESEND_API_KEY` | Resend API key — **required**, server throws on startup if missing |
+| `FROM_EMAIL` | Sender address in outgoing emails (default: `Focusoura <noreply@focusoura.com>`) |
 
 ---
 
@@ -1616,3 +1618,21 @@ CREATE INDEX IF NOT EXISTS "calendar_user_id_idx"    ON "calendar_items" ("user_
 CREATE INDEX IF NOT EXISTS "calendar_subject_id_idx" ON "calendar_items" ("subject_id");
 CREATE INDEX IF NOT EXISTS "calendar_due_date_idx"   ON "calendar_items" ("due_date");
 ```
+
+---
+
+## 14. Email — Resend SDK (2026-05-10)
+
+**Done**: Wired Resend SDK for email verification and password reset.
+
+### Changes
+- `artifacts/api-server/src/lib/email.ts` — full rewrite: raw `fetch` → `resend` npm SDK; added `sendPasswordResetEmail`; HTML + plain-text emails; `RESEND_API_KEY` throws at startup if missing; URL built from `APP_URL` env var; `FROM_EMAIL` env var supported.
+- `artifacts/api-server/src/routes/auth.ts` — updated two call sites: `sendVerificationEmail` now takes positional `(to, displayName, token)` args (URL construction moved into email.ts); `POST /forgot-password` now calls `sendPasswordResetEmail(email, displayName, rawToken)` instead of inline `sendEmail`.
+- `.env.example` — added `FROM_EMAIL`; updated `RESEND_API_KEY` comment to reflect required status.
+
+### Railway env vars to add
+| Variable | Value |
+|----------|-------|
+| `RESEND_API_KEY` | Your key from resend.com/api-keys |
+| `FROM_EMAIL` | `Focusoura <noreply@yourdomain.com>` (domain must be verified in Resend) |
+| `APP_URL` | `https://focusoura.vercel.app` (already set if friend links work) |
