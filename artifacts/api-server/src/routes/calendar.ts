@@ -47,19 +47,24 @@ router.post("/", async (req, res) => {
   const VALID_TYPES = ["homework", "exam", "other"];
   const normalizedType = VALID_TYPES.includes(type) ? type : "homework";
 
-  const [item] = await db
-    .insert(calendarItemsTable)
-    .values({
-      id: genId("cal"),
-      userId,
-      subjectId: subjectId === "general" ? null : subjectId,
-      title,
-      type: normalizedType,
-      dueDate: new Date(dueDate),
-    })
-    .returning();
+  try {
+    const [item] = await db
+      .insert(calendarItemsTable)
+      .values({
+        id: genId("cal"),
+        userId,
+        subjectId: subjectId === "general" ? null : subjectId,
+        title,
+        type: normalizedType,
+        dueDate: new Date(dueDate),
+      })
+      .returning();
 
-  return res.status(201).json(item);
+    return res.status(201).json(item);
+  } catch (err) {
+    logger.error({ msg: "POST /calendar failed", error: err instanceof Error ? err.message : String(err) });
+    return res.status(500).json({ error: "Failed to create calendar item" });
+  }
 });
 
 router.patch("/:id", async (req, res) => {
