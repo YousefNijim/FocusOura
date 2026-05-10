@@ -7,7 +7,7 @@ if (!process.env.RESEND_API_KEY) {
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM_EMAIL = process.env.FROM_EMAIL ?? "Focusoura <noreply@focusoura.com>";
+const FROM_EMAIL = process.env.FROM_EMAIL ?? "Focusoura <noreply@codeoura.com>";
 const APP_URL = process.env.APP_URL ?? "https://focusoura.vercel.app";
 
 export async function sendVerificationEmail(

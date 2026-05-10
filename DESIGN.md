@@ -939,7 +939,7 @@ Base URL: `/api`
 | `VITE_API_BASE_URL` | API base URL for web app (empty = Vite proxy) |
 | `APP_URL` / `REPLIT_DEV_DOMAIN` | Base URL for friend invite links and email links |
 | `RESEND_API_KEY` | Resend API key — **required**, server throws on startup if missing |
-| `FROM_EMAIL` | Sender address in outgoing emails (default: `Focusoura <noreply@focusoura.com>`) |
+| `FROM_EMAIL` | Sender address in outgoing emails (default: `Focusoura <noreply@codeoura.com>`) |
 
 ---
 
