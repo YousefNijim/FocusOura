@@ -1575,3 +1575,44 @@ CREATE TABLE IF NOT EXISTS "email_verification_tokens" (
 CREATE INDEX IF NOT EXISTS "evt_token_hash_idx" ON "email_verification_tokens" ("token_hash");
 CREATE INDEX IF NOT EXISTS "evt_user_id_idx"    ON "email_verification_tokens" ("user_id");
 ```
+
+---
+
+## 13. Production Error Fixes (2026-05-10)
+
+### Fix A — challenges: `endTime` → `end_time` column name
+
+**Root cause**: `lib/db/src/schema/focusoura.ts` defined the `endTime` column as `timestamp("endTime")` — using the JavaScript property name as the SQL column name instead of the snake_case convention used by every other column. Drizzle generated `"endTime"` in all SQL, but the production DB column is `end_time`. This caused `GET /challenges` to 500 on every request once any active challenge existed (the `resolveExpiredChallenges` function queries `WHERE "challenges"."endTime" < $2`). Challenge joins also silently failed to write the `end_time` value.
+
+**Fix applied**: Changed `timestamp("endTime")` → `timestamp("end_time")` in `lib/db/src/schema/focusoura.ts`. No migration required — the production DB already has the column as `end_time`.
+
+**File changed**: `lib/db/src/schema/focusoura.ts` line 232
+
+### Fix B — calendar_items insert failing (UUID vs TEXT id type)
+
+**Root cause**: An earlier migration created `calendar_items` with `id UUID PRIMARY KEY` (incorrect type). The Drizzle schema and application code use `text("id")` and generate string IDs like `cal_1778398672141_ea24mj`. PostgreSQL rejects a non-UUID string inserted into a UUID column, causing every `POST /calendar` and `GET /calendar` to 500.
+
+**Fix applied**: Migration file `artifacts/api-server/migrations/003_fix_calendar_items.sql` drops and recreates the table with the correct `id TEXT PRIMARY KEY`. Safe to run — table was newly created with no user data.
+
+**Migration to run on Railway:**
+
+```sql
+-- Run: railway run psql $DATABASE_URL -f artifacts/api-server/migrations/003_fix_calendar_items.sql
+
+DROP TABLE IF EXISTS "calendar_items";
+
+CREATE TABLE "calendar_items" (
+  "id"         text      PRIMARY KEY,
+  "user_id"    text      NOT NULL,
+  "subject_id" text,
+  "title"      text      NOT NULL,
+  "type"       text      NOT NULL DEFAULT 'homework',
+  "due_date"   timestamp NOT NULL,
+  "completed"  boolean   NOT NULL DEFAULT false,
+  "created_at" timestamp NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS "calendar_user_id_idx"    ON "calendar_items" ("user_id");
+CREATE INDEX IF NOT EXISTS "calendar_subject_id_idx" ON "calendar_items" ("subject_id");
+CREATE INDEX IF NOT EXISTS "calendar_due_date_idx"   ON "calendar_items" ("due_date");
+```

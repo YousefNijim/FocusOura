@@ -229,7 +229,7 @@ export const challengesTable = pgTable("challenges", {
   challengeType: text("challenge_type").notNull().default("competitive"),
   durationDays: integer("duration_days").notNull().default(7),
   startTime: timestamp("start_time"),
-  endTime: timestamp("endTime"),
+  endTime: timestamp("end_time"),
   winnerId: text("winner_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => {
