@@ -15,6 +15,10 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import NetInfo from '@react-native-community/netinfo';
+import * as WebBrowser from 'expo-web-browser';
+
+// Required for iOS SFSafariViewController auth session completion
+WebBrowser.maybeCompleteAuthSession();
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -116,9 +120,10 @@ export default function App() {
     }
   }
 
-  const onMessage = (event: any) => {
+  const onMessage = async (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
+
       if (data.type === 'NOTIFY') {
         Notifications.scheduleNotificationAsync({
           content: {
@@ -127,6 +132,24 @@ export default function App() {
           },
           trigger: null,
         });
+      } else if (data.type === 'GOOGLE_SIGN_IN') {
+        // Open web app login page in Chrome Custom Tab — Google OAuth works in real Chrome
+        const result = await WebBrowser.openAuthSessionAsync(
+          `${WEB_URL}/login?return=native&auto=google`,
+          'focusoura://auth'
+        );
+        if (result.type === 'success') {
+          const params = new URLSearchParams(result.url.split('?')[1] ?? '');
+          const token = params.get('token');
+          if (token && webViewRef.current) {
+            // Inject JWT into WebView localStorage and reload — AuthContext picks it up
+            webViewRef.current.injectJavaScript(
+              `localStorage.setItem('focusoura_token', ${JSON.stringify(token)});` +
+              `window.location.href = '/';` +
+              `true;`
+            );
+          }
+        }
       }
     } catch (e) {
       console.error('WebView Message Error:', e);

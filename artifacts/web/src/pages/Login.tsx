@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Eye, EyeOff, Leaf } from "lucide-react";
 import { signInWithGoogle, getGoogleRedirectResult } from "@/lib/firebase";
-import { API_BASE } from "@/utils/api";
+import { API_BASE, getToken } from "@/utils/api";
 
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login, loginWithGoogle, isAuthenticated } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,33 +18,57 @@ export default function Login() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [firebaseAvailable, setFirebaseAvailable] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    if (isAuthenticated) navigate("/", { replace: true });
-  }, [isAuthenticated, navigate]);
+  // ?return=native  → opened by the native app in a Chrome Custom Tab
+  // ?auto=google    → auto-trigger Google sign-in immediately on load
+  const returnNative = searchParams.get("return") === "native";
+  const autoGoogle = searchParams.get("auto") === "google";
 
-  // Pick up the result after signInWithRedirect() returns from Google
   useEffect(() => {
-    getGoogleRedirectResult()
-      .then(async (idToken) => {
-        if (idToken) {
-          setGoogleLoading(true);
-          await loginWithGoogle(idToken);
-          navigate("/", { replace: true });
-        }
-      })
-      .catch((e: any) => {
-        if (!e.message?.includes("not configured")) {
-          setError(e.message || "Google sign-in failed. Please try again.");
-        }
-      });
-  }, []);
+    // Skip auto-navigate when in Custom Tab mode — handlePostLogin handles the return
+    if (isAuthenticated && !returnNative) navigate("/", { replace: true });
+  }, [isAuthenticated, navigate, returnNative]);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/config/firebase`)
-
       .then((r) => setFirebaseAvailable(r.ok))
       .catch(() => setFirebaseAvailable(false));
   }, []);
+
+  // On mount: check for a pending Google redirect result, then auto-trigger if requested.
+  // This handles both the Custom Tab ?auto=google first-load and the redirect return.
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const idToken = await getGoogleRedirectResult();
+        if (idToken) {
+          setGoogleLoading(true);
+          await loginWithGoogle(idToken);
+          handlePostLogin();
+          return;
+        }
+      } catch (e: any) {
+        if (!e.message?.includes("not configured")) {
+          setError(e.message || "Google sign-in failed. Please try again.");
+        }
+        return;
+      }
+      // No redirect result pending — auto-start Google sign-in if requested
+      if (autoGoogle) {
+        handleGoogleLogin();
+      }
+    };
+    run();
+  }, []);
+
+  // After a successful login, return to the native app via deep link or navigate normally.
+  function handlePostLogin() {
+    if (returnNative) {
+      const token = getToken();
+      window.location.href = `focusoura://auth?token=${encodeURIComponent(token ?? "")}`;
+    } else {
+      navigate("/", { replace: true });
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,11 +90,12 @@ export default function Login() {
     try {
       const idToken = await signInWithGoogle();
       if (idToken) {
-        // Popup flow — result available immediately
+        // Desktop popup — result available immediately
         await loginWithGoogle(idToken);
-        navigate("/", { replace: true });
+        handlePostLogin();
       }
-      // Redirect flow — page navigates away; result handled in useEffect on return
+      // WebView: native handles auth via Custom Tab
+      // Custom Tab redirect: page navigates away; result caught by useEffect on return
     } catch (e: any) {
       setError(e.message || "Google login failed. Please try again.");
       setGoogleLoading(false);

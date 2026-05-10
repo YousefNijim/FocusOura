@@ -36,8 +36,10 @@ export async function ensureFirebaseReady(): Promise<void> {
   return configPromise;
 }
 
-// Returns the ID token on popup success, or null when redirect is initiated
-// (redirect: page navigates away — caller should not expect a return value)
+// Returns the ID token on popup success, or null in all other cases:
+//   - WebView: posts GOOGLE_SIGN_IN to native (native opens Chrome Custom Tab)
+//   - Custom Tab (?return=native): uses signInWithRedirect (page navigates away)
+//   - Desktop: uses signInWithPopup (returns token immediately)
 export async function signInWithGoogle(): Promise<string | null> {
   await ensureFirebaseReady();
   if (!auth) throw new Error("Firebase Auth not initialized");
@@ -46,10 +48,22 @@ export async function signInWithGoogle(): Promise<string | null> {
   provider.addScope("profile");
 
   if (isWebView()) {
-    await signInWithRedirect(auth, provider);
-    return null; // unreachable — page redirects
+    // Google blocks OAuth inside WebViews — delegate to native Chrome Custom Tab
+    if ((window as any).ReactNativeWebView) {
+      (window as any).ReactNativeWebView.postMessage(
+        JSON.stringify({ type: "GOOGLE_SIGN_IN" })
+      );
+    }
+    return null;
   }
 
+  if (new URLSearchParams(window.location.search).get("return") === "native") {
+    // Opened by native app in Chrome Custom Tab — use redirect (popup unreliable in Custom Tab)
+    await signInWithRedirect(auth, provider);
+    return null; // page navigates away
+  }
+
+  // Desktop browser — popup gives the best UX
   const result = await signInWithPopup(auth, provider);
   return result.user.getIdToken();
 }

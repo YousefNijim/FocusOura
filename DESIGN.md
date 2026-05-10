@@ -1639,19 +1639,45 @@ CREATE INDEX IF NOT EXISTS "calendar_due_date_idx"   ON "calendar_items" ("due_d
 
 ## 15. Google OAuth in Mobile WebView (2026-05-10)
 
-**Done**: Fix: Google OAuth in mobile WebView — `signInWithRedirect()` for WebView, `signInWithPopup()` for desktop. `getRedirectResult()` handles return flow.
+**Done**: Fix: Google OAuth — Chrome Custom Tab via `expo-web-browser`. WebView postMessage triggers external browser. Deep link `focusoura://auth` returns token to app.
 
 ### Problem
-`signInWithPopup()` fails inside Android/iOS WebViews with `auth/popup-closed-by-user` — Google blocks OAuth popups in embedded browsers.
+Google blocks OAuth completely inside Android/iOS WebViews since 2021 with `403 disallowed_useragent`. Cannot be fixed by changing WebView settings. Must exit the WebView.
+
+### Solution
+Open Google OAuth in Chrome Custom Tab (real browser) via `expo-web-browser`. After auth completes, web app deep-links `focusoura://auth?token=JWT` back to the native app, which injects the JWT into the WebView.
+
+### Flow
+```
+User taps Google in WebView
+  → WebView posts { type: 'GOOGLE_SIGN_IN' } to native
+  → Native opens WEB_URL/login?return=native&auto=google in Chrome Custom Tab
+  → Web app auto-triggers signInWithRedirect (popup unreliable in Custom Tab)
+  → Google OAuth completes in real Chrome
+  → Firebase redirects back to the login page
+  → Web app calls loginWithGoogle() → backend JWT → stored in localStorage
+  → Web app does window.location.href = 'focusoura://auth?token=JWT'
+  → openAuthSessionAsync intercepts deep link, closes Custom Tab
+  → Native injects JWT into WebView localStorage + reloads to /
+  → AuthContext reads token → user authenticated
+```
 
 ### Changes
-- `artifacts/web/src/lib/environment.ts` — new file: `isWebView()` detects Android WV flag, iOS without Safari, Expo, `ReactNativeWebView` global; `isMobile()` for UA-based mobile detection.
-- `artifacts/web/src/lib/firebase.ts` — `signInWithGoogle()` now branches: `signInWithRedirect()` in WebView (returns null, page navigates away), `signInWithPopup()` on desktop (returns ID token). Added `getGoogleRedirectResult()` export — call on every page load to pick up the pending redirect result.
-- `artifacts/web/src/pages/Login.tsx` — added `useEffect` on mount that calls `getGoogleRedirectResult()` and, if a token is returned, calls `loginWithGoogle()` + navigates. `handleGoogleLogin` guards the null return from the redirect path.
-- `artifacts/mobile/App.tsx` — added `oauth2.googleapis.com` and `www.googleapis.com` to `onShouldStartLoadWithRequest` allowlist; added explicit `/__/auth/` check; added `javaScriptCanOpenWindowsAutomatically={false}`.
+- `artifacts/mobile/package.json` — added `expo-web-browser`
+- `artifacts/mobile/app.json` — added `scheme: "focusoura"` and Android `intentFilters` for `focusoura://auth`
+- `artifacts/mobile/App.tsx` — added `WebBrowser` import; `WebBrowser.maybeCompleteAuthSession()` at module level; `onMessage` handles `GOOGLE_SIGN_IN` → `WebBrowser.openAuthSessionAsync` → extracts token → injects into WebView
+- `artifacts/web/src/lib/environment.ts` — new: `isWebView()` and `isMobile()` helpers
+- `artifacts/web/src/lib/firebase.ts` — `signInWithGoogle()` branches: WebView → posts `GOOGLE_SIGN_IN` to native; `?return=native` (Custom Tab) → `signInWithRedirect`; desktop → `signInWithPopup`. Added `getGoogleRedirectResult()` export.
+- `artifacts/web/src/pages/Login.tsx` — detects `?return=native` / `?auto=google`; `handlePostLogin()` redirects to `focusoura://auth?token=...` when in Custom Tab mode; redirect result useEffect also auto-triggers sign-in when `?auto=google` present and no result pending
 
 ### Firebase / Google Cloud Console changes required
 - **Firebase Console** → Authentication → Sign-in method → Google → Authorized domains: confirm `focusoura.vercel.app` is listed.
 - **Google Cloud Console** → APIs → Credentials → OAuth 2.0 Client → Authorized redirect URIs must include:
   - `https://focusoura.vercel.app/__/auth/handler`
   - `https://focusoura-99dae.firebaseapp.com/__/auth/handler`
+
+### Build required
+After these changes a new EAS build is required (native code changed — `expo-web-browser` and `app.json` scheme):
+```
+eas build --platform android --profile preview
+```
