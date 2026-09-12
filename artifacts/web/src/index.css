@@ -262,3 +262,23 @@ nav.fixed.bottom-0 {
 @media (prefers-reduced-motion: reduce) {
   .plant-sway { animation: none; }
 }
+
+/* ── Garden shelving ───────────────────────────────────────────────────────
+   The plants are drawn face-on in pots, so they stand on shelves rather than
+   on the old isometric lawn. Wood and wall are tokens for the same reason the
+   plants are: the previous scene's #5bbf5b grass stayed neon at night. */
+:root {
+  --garden-wall: #EFE7DA;
+  --shelf-top:   #D8B792;
+  --shelf-face:  #C29A73;
+  --shelf-edge:  #9A7550;
+  --shelf-shadow:#6B4F35;
+}
+
+.dark {
+  --garden-wall: #161E1A;
+  --shelf-top:   #5E4834;
+  --shelf-face:  #4A3728;
+  --shelf-edge:  #332519;
+  --shelf-shadow:#0C0A07;
+}
