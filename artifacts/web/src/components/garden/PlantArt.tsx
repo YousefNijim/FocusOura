@@ -161,7 +161,9 @@ const ART: Record<PlantType, Record<PlantStage | 1 | 2 | 3 | 4, ReactNode>> = {
       <>
         <path d="M96 185 Q94 154 102 126 Q108 112 120 108 Q130 106 132 116" stroke="var(--dead-mid)" strokeWidth="3.6" fill="none" strokeLinecap="round" />
         <path d="M99 146 Q84 140 72 128" stroke="var(--dead-mid)" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-        <g transform="translate(114,104) rotate(150) scale(0.40)">
+        {/* The stem ends at (132,116); translating the petal hinge (50,50) onto
+            that point is what keeps the head attached to it. */}
+        <g transform="translate(132,116) rotate(150) scale(0.40) translate(-50,-50)">
           <g fill="url(#gPetalDead)">
             <use href="#petal" />
             <use href="#petal" transform="rotate(72 50 50)" />
@@ -478,7 +480,7 @@ const ART: Record<PlantType, Record<PlantStage | 1 | 2 | 3 | 4, ReactNode>> = {
         <ellipse cx="80" cy="179" rx="20" ry="6.4" fill="var(--dead-mid)" transform="rotate(-14 80 179)" />
         <ellipse cx="120" cy="181" rx="18" ry="5.8" fill="var(--dead-hi)" opacity="0.8" transform="rotate(12 120 181)" />
         <path d="M100 176 Q106 150 100 126 Q98 118 92 116" stroke="var(--dead-mid)" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-        <g transform="translate(92,116) rotate(160) scale(0.5)" opacity="0.75">
+        <g transform="translate(92,116) rotate(160) scale(0.5) translate(-50,-50)" opacity="0.75">
           <g fill="url(#gPetalDead)">
             <use href="#petal" />
             <use href="#petal" transform="rotate(100 50 50)" />
