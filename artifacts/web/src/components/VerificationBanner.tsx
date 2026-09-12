@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Mail, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { API_BASE } from "@/utils/api";
+import { API_BASE, VERIFY_BANNER_DISMISSED_KEY, VERIFICATION_REQUIRED_EVENT } from "@/utils/api";
 
 
-const DISMISSED_KEY = "focusoura_verify_banner_dismissed";
 
 export function VerificationBanner() {
   const { authUser, token, isAuthenticated } = useAuth();
-  const [dismissed, setDismissed] = useState(() => sessionStorage.getItem(DISMISSED_KEY) === "1");
+  const [dismissed, setDismissed] = useState(() => sessionStorage.getItem(VERIFY_BANNER_DISMISSED_KEY) === "1");
   const [resendStatus, setResendStatus] = useState<"idle" | "loading" | "sent" | "error">("idle");
   const [cooldown, setCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -17,11 +16,19 @@ export function VerificationBanner() {
     return () => { if (cooldownRef.current) clearInterval(cooldownRef.current); };
   }, []);
 
+  // A dismissed banner comes back the moment the API refuses an action for
+  // being unverified — that is when the user needs the explanation.
+  useEffect(() => {
+    const reveal = () => setDismissed(false);
+    window.addEventListener(VERIFICATION_REQUIRED_EVENT, reveal);
+    return () => window.removeEventListener(VERIFICATION_REQUIRED_EVENT, reveal);
+  }, []);
+
   // Don't render for verified users, unauthenticated users, or dismissed sessions
   if (!isAuthenticated || !authUser || authUser.emailVerified || dismissed) return null;
 
   function dismiss() {
-    sessionStorage.setItem(DISMISSED_KEY, "1");
+    sessionStorage.setItem(VERIFY_BANNER_DISMISSED_KEY, "1");
     setDismissed(true);
   }
 

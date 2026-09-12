@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { MobileLayout } from "@/components/MobileLayout";
 import { ShoppingBag, Coins, Check, Sparkles, Frame, Palette, Shirt, X, Lock } from "lucide-react";
-import { fetchApi } from "@/utils/api";
+import { fetchApi, describeApiError } from "@/utils/api";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import { useInventory, type StoreItem } from "@/hooks/useInventory";
@@ -70,8 +70,7 @@ export default function Store() {
       toast({ title: `🎉 Purchased ${item.name}!`, description: `New balance: ${result.newBalance} coins` });
       await Promise.all([fetchItems(), refreshData(), refreshInventory()]);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Purchase failed";
-      toast({ title: msg, variant: "destructive" });
+      toast({ ...describeApiError(err, "Purchase failed"), variant: "destructive" });
     } finally {
       setBuying(null);
     }

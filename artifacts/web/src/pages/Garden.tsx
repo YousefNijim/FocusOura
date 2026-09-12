@@ -10,7 +10,7 @@ import {
   startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
 } from "date-fns";
 import { useUser } from "@/context/UserContext";
-import { fetchApi } from "@/utils/api";
+import { fetchApi, describeApiError } from "@/utils/api";
 import { useToast } from "@/hooks/use-toast";
 import { getPetById, getPetMoodFromKey } from "@/constants/pets";
 
@@ -245,8 +245,8 @@ export default function Garden() {
       setNewName(""); setShowAdd(false);
       await refreshData();
       toast({ title: "Subject added!", description: `${newName} added to your garden.` });
-    } catch {
-      toast({ title: "Error", description: "Could not add subject", variant: "destructive" });
+    } catch (err) {
+      toast({ ...describeApiError(err, "Could not add subject"), variant: "destructive" });
     } finally { setAdding(false); }
   };
 
