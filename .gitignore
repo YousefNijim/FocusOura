@@ -50,3 +50,9 @@ Thumbs.db
 
 .vercel
 .claude/worktrees/charming-lovelace-dec71b/
+
+# Environment files — never commit secrets
+.env
+.env.*
+!.env.example
+!.env.android
