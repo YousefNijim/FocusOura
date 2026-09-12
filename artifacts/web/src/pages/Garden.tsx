@@ -34,7 +34,10 @@ const colorOptions = [
 // isometric lawn, where a face-on pot floats above its tile instead of resting
 // on it, and its colours were hard-coded so the ground stayed bright green in
 // night mode while the plants went teal.
-const POTS_PER_SHELF = 3;
+// Two, not three: the app shell is max-w-md, and a pot does not grow with its
+// plant — at three across, a level-1 seedling rendered about six pixels tall
+// inside a full-size pot and the slot read as empty.
+const POTS_PER_SHELF = 2;
 
 function PottingShelf({
   plants,
@@ -59,7 +62,7 @@ function PottingShelf({
     <div className="flex flex-col gap-5">
       {shelves.map((shelf, shelfIndex) => (
         <div key={shelfIndex}>
-          <div className="grid grid-cols-3 gap-1.5 items-end px-1.5">
+          <div className="grid grid-cols-2 gap-3 items-end px-1.5">
             {shelf.map((plant, i) =>
               plant ? (
                 <button
@@ -71,19 +74,21 @@ function PottingShelf({
                   <PlantArt
                     type={toPlantType(plant.plantType)}
                     stage={plant.withered ? "withered" : stageForGrowth(plant.growthLevel)}
-                    className="w-full h-auto max-h-[130px]"
+                    className="w-full h-auto max-h-[150px]"
                   />
                 </button>
               ) : (
                 <button
                   key={`add-${shelfIndex}-${i}`}
                   onClick={onAdd}
-                  className="flex flex-col items-center justify-end gap-2 h-[130px] text-muted-foreground hover:text-primary transition-colors"
+                  aria-label="Add a subject"
+                  className="group/add flex items-end justify-center h-[150px] text-muted-foreground hover:text-primary transition-colors"
                 >
-                  <span className="w-[54px] h-[34px] rounded-t-[3px] rounded-b-xl border-[1.5px] border-dashed border-border group-hover:border-primary flex items-center justify-center text-lg leading-none">
+                  {/* Sits on the plank like a real pot — its caption goes in the
+                      row below, where every other caption lives. */}
+                  <span className="w-[62px] h-[40px] rounded-t-[3px] rounded-b-xl border-[1.5px] border-dashed border-border group-hover/add:border-primary flex items-center justify-center text-xl leading-none">
                     +
                   </span>
-                  <span className="text-[10px]">Add subject</span>
                 </button>
               ),
             )}
@@ -99,9 +104,15 @@ function PottingShelf({
             }}
           />
 
-          <div className="grid grid-cols-3 gap-1.5 px-1.5 mt-2.5">
+          <div className="grid grid-cols-2 gap-3 px-1.5 mt-2.5">
             {shelf.map((plant, i) => {
-              if (!plant) return <div key={`gap-${shelfIndex}-${i}`} />;
+              if (!plant) {
+                return (
+                  <p key={`gap-${shelfIndex}-${i}`} className="text-[11px] text-center text-muted-foreground">
+                    Add subject
+                  </p>
+                );
+              }
               const subject = subjects.find((s) => s.id === plant.subjectId);
               const pct = Math.min(
                 100,
