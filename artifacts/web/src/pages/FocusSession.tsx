@@ -16,7 +16,7 @@ import { useAmbientSound } from "@/hooks/useAmbientSound";
 import { AmbientSoundPicker } from "@/components/AmbientSoundPicker";
 import { useInventory } from "@/hooks/useInventory";
 import { useMotivationMessage } from "@/hooks/useMotivationMessage";
-import PlantArt, { stageForGrowth } from "@/components/garden/PlantArt";
+import PlantArt, { stageForGrowth, toPlantType } from "@/components/garden/PlantArt";
 
 const SESSION_TYPES = [
   { id: "routine",    label: "Routine",    icon: BookOpen, multiplier: 1 },
@@ -137,46 +137,6 @@ function ProgressRing({
   );
 }
 
-// ─── Plant Carousel ────────────────────────────────────────────────────────────
-function PlantCarousel({ index, onChange, disabled }: { index: number; onChange: (i: number) => void; disabled: boolean }) {
-  const startX = useRef<number | null>(null);
-  const prev   = () => onChange((index - 1 + PLANT_CATALOG.length) % PLANT_CATALOG.length);
-  const next   = () => onChange((index + 1) % PLANT_CATALOG.length);
-  const plant  = PLANT_CATALOG[index];
-
-  return (
-    <div className="flex flex-col items-center gap-1 select-none"
-      onTouchStart={(e) => { startX.current = e.touches[0].clientX; }}
-      onTouchEnd={(e) => {
-        if (startX.current === null || disabled) return;
-        const dx = e.changedTouches[0].clientX - startX.current;
-        if (Math.abs(dx) > 30) dx < 0 ? next() : prev();
-        startX.current = null;
-      }}
-    >
-      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">Choose Plant</p>
-      <div className="flex items-center gap-4 mt-1">
-        <button onClick={prev} disabled={disabled} className="w-8 h-8 rounded-full glass flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30">
-          <ChevronLeft size={16} />
-        </button>
-        <div className="flex flex-col items-center gap-0.5 w-28">
-          <PlantArt type={plant.id} stage={4} className="w-14 h-14 drop-shadow-md transition-all duration-300" />
-          <p className="text-sm font-semibold text-foreground">{plant.name}</p>
-          <p className="text-[11px] text-muted-foreground">{plant.desc}</p>
-        </div>
-        <button onClick={next} disabled={disabled} className="w-8 h-8 rounded-full glass flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30">
-          <ChevronRight size={16} />
-        </button>
-      </div>
-      <div className="flex gap-1 mt-1.5">
-        {PLANT_CATALOG.map((_, i) => (
-          <div key={i} className={`h-1.5 rounded-full transition-all ${i === index ? "bg-primary w-3" : "bg-muted w-1.5"}`} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ─── Wallet Modal ──────────────────────────────────────────────────────────────
 function WalletModal({ open, onClose, plants }: { open: boolean; onClose: () => void; plants: PlantRecord[] }) {
   if (!open) return null;
@@ -257,7 +217,6 @@ export default function FocusSession() {
 
   // Local UI state (doesn't need to survive navigation)
   const [timerMode, setTimerMode]             = useState<TimerMode>(session?.mode ?? "countdown");
-  const [plantIndex, setPlantIndex]           = useState(session?.plantIndex ?? 0);
   const [sessionType, setSessionType]         = useState(SESSION_TYPES.find(t => t.id === session?.sessionTypeId) ?? SESSION_TYPES[0]);
   const [selectedSubjectId, setSelectedSubjectId] = useState(session?.subjectId ?? navSubjectId);
   const [countdownMins, setCountdownMins]     = useState(session?.countdownMins ?? 25);
@@ -295,7 +254,6 @@ export default function FocusSession() {
   useEffect(() => {
     if (session) {
       setTimerMode(session.mode);
-      setPlantIndex(session.plantIndex);
       setSessionType(SESSION_TYPES.find(t => t.id === session.sessionTypeId) ?? SESSION_TYPES[0]);
       setSelectedSubjectId(session.subjectId);
       setCountdownMins(session.countdownMins);
@@ -368,8 +326,7 @@ export default function FocusSession() {
     refetchMotivation();
     try {
       await startSession({
-        plantIndex,
-        plantType:            PLANT_CATALOG[plantIndex].id,
+        plantType:            activePlantType,
         sessionTypeId:        sessionType.id,
         sessionTypeMultiplier: sessionType.multiplier,
         subjectId:            selectedSubjectId || undefined,
@@ -517,7 +474,20 @@ export default function FocusSession() {
   };
 
   const selectedSubject   = subjects.find((s) => s.id === selectedSubjectId);
-  const activePlantType   = PLANT_CATALOG[plantIndex].id;
+  // The plant this session will actually grow: the selected subject's own, or
+  // the single unsorted one. The carousel used to pick a species here and the
+  // API discarded it for every subject session, so the ring showed one plant
+  // while a different one grew.
+  const sessionPlant      = plants.find((p) =>
+    selectedSubjectId ? p.subjectId === selectedSubjectId : !p.subjectId,
+  );
+  const activePlantType   = toPlantType(sessionPlant?.plantType);
+  const activePlantStage  = sessionPlant
+    ? (sessionPlant.withered ? "withered" : stageForGrowth(sessionPlant.growthLevel))
+    : 1;
+  const activePlantName   = sessionPlant
+    ? (subjects.find((s) => s.id === sessionPlant.subjectId)?.name ?? "Unsorted")
+    : "New plant";
   const previewPlants     = Math.floor(countdownMins / PLANT_INTERVAL_MINS);
   const actualElapsedMins = Math.floor(elapsedSecs / 60);
   const countdownProgress = session?.mode === "countdown" && session.countdownMins > 0
@@ -579,11 +549,6 @@ export default function FocusSession() {
           </div>
         </div>
 
-        {/* Plant Carousel */}
-        <div className="glass rounded-2xl p-4">
-          <PlantCarousel index={plantIndex} onChange={setPlantIndex} disabled={isActive} />
-        </div>
-
         {/* Mode Toggle (idle only) */}
         {isIdle && (
           <div className="glass rounded-xl p-1 grid grid-cols-2 gap-1">
@@ -605,7 +570,7 @@ export default function FocusSession() {
           {/* Countdown idle — circular picker */}
           {timerMode === "countdown" && isIdle && (
             <CircularPicker minutes={countdownMins} onChange={setCountdownMins} disabled={false}>
-              <PlantArt type={activePlantType} stage={4} className="w-14 h-14 mb-0.5" />
+              <PlantArt type={activePlantType} stage={activePlantStage} className="w-14 h-14 mb-0.5" />
               <span className="text-3xl font-bold text-foreground font-mono leading-none">
                 {String(countdownMins).padStart(2, "0")}m
               </span>
@@ -618,7 +583,7 @@ export default function FocusSession() {
           {/* Stopwatch idle */}
           {timerMode === "stopwatch" && isIdle && (
             <ProgressRing progress={0}>
-              <PlantArt type={activePlantType} stage={4} className="w-14 h-14 mb-0.5" />
+              <PlantArt type={activePlantType} stage={activePlantStage} className="w-14 h-14 mb-0.5" />
               <span className="text-3xl font-bold text-foreground font-mono leading-none">00:00</span>
               <span className="text-[11px] text-muted-foreground mt-0.5">Ready</span>
             </ProgressRing>
@@ -628,7 +593,7 @@ export default function FocusSession() {
           {session?.mode === "countdown" && isActive && (
             <div className={`transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}>
               <ProgressRing progress={countdownProgress}>
-                <PlantArt type={activePlantType} stage={4} className={`w-14 h-14 mb-0.5 ${isRunning ? "animate-float" : ""}`} />
+                <PlantArt type={activePlantType} stage={activePlantStage} className={`w-14 h-14 mb-0.5 ${isRunning ? "animate-float" : ""}`} />
                 <span className="text-3xl font-bold text-foreground font-mono leading-none">{formatTime(timeLeft)}</span>
                 {isPaused ? (
                   <span className="flex items-center gap-1 text-[11px] text-amber-500 mt-0.5 font-medium">
@@ -646,7 +611,7 @@ export default function FocusSession() {
           {session?.mode === "stopwatch" && isActive && (
             <div className={`transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}>
               <ProgressRing progress={stopwatchProgress}>
-                <PlantArt type={activePlantType} stage={4} className={`w-14 h-14 mb-0.5 ${isRunning ? "animate-float" : ""}`} />
+                <PlantArt type={activePlantType} stage={activePlantStage} className={`w-14 h-14 mb-0.5 ${isRunning ? "animate-float" : ""}`} />
                 <span className="text-3xl font-bold text-foreground font-mono leading-none">{formatTime(elapsedSecs)}</span>
                 {isPaused ? (
                   <span className="flex items-center gap-1 text-[11px] text-amber-500 mt-0.5 font-medium">
@@ -881,7 +846,7 @@ export default function FocusSession() {
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Plant</p>
-                <p className="text-sm font-medium text-foreground">{PLANT_CATALOG[plantIndex].name}</p>
+                <p className="text-sm font-medium text-foreground truncate">{activePlantName}</p>
               </div>
               <div>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Elapsed</p>
