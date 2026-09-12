@@ -32,7 +32,7 @@ const PLANT_INTERVAL_MINS = 25;
 interface PlantRecord {
   id: string; subjectId: string | null; subjectName: string;
   plantType: string; growthLevel: number; growthPoints: number;
-  maxGrowthPoints: number; accentColor: string;
+  maxGrowthPoints: number; accentColor: string; withered?: boolean;
 }
 
 // ─── Circular Duration Picker ──────────────────────────────────────────────────
@@ -206,7 +206,7 @@ function WalletModal({ open, onClose, plants }: { open: boolean; onClose: () => 
             const pct = Math.floor((plant.growthPoints / plant.maxGrowthPoints) * 100);
             return (
               <div key={plant.id} className="glass rounded-xl p-3 flex items-center gap-3">
-                <PlantArt type={cat.id} stage={stageForGrowth(plant.growthLevel)} className="w-12 h-12 flex-shrink-0" />
+                <PlantArt type={cat.id} stage={plant.withered ? "withered" : stageForGrowth(plant.growthLevel)} className="w-12 h-12 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
                     <p className="text-sm font-semibold text-foreground">{cat.name}</p>

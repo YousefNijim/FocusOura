@@ -454,7 +454,7 @@ router.put("/:sessionId", async (req, res) => {
         .where(eq(plantsTable.id, targetPlantId))
         .limit(1);
 
-      if (plantData.length) {
+      if (plantData.length && state === "completed") {
         const plant = plantData[0];
         let newPoints = (plant.growthPoints ?? 0) + growthPoints;
         let newLevel = plant.growthLevel ?? 1;
@@ -468,7 +468,13 @@ router.put("/:sessionId", async (req, res) => {
 
         await db
           .update(plantsTable)
-          .set({ growthPoints: newPoints, growthLevel: newLevel, maxGrowthPoints: maxPoints })
+          .set({
+            growthPoints: newPoints,
+            growthLevel: newLevel,
+            maxGrowthPoints: maxPoints,
+            // A finished session revives a withered plant.
+            witheredAt: null,
+          })
           .where(eq(plantsTable.id, targetPlantId));
       }
     }
@@ -545,6 +551,36 @@ router.put("/:sessionId", async (req, res) => {
         msg: "Failed to update challenge progress after session completion — participant minutes may be out of sync",
         error: error instanceof Error ? error.message : String(error),
         context: { sessionId, userId },
+      });
+    }
+  }
+
+  // Withering: an aborted session leaves the plant withered until the next
+  // completed one on it, and costs half its progress toward the next level.
+  // The level itself is kept — losing a level would erase days of work for
+  // one cancelled session.
+  if (state === "aborted" && session.plantId) {
+    try {
+      const [withering] = await db
+        .select({ growthPoints: plantsTable.growthPoints })
+        .from(plantsTable)
+        .where(eq(plantsTable.id, session.plantId))
+        .limit(1);
+
+      if (withering) {
+        await db
+          .update(plantsTable)
+          .set({
+            witheredAt: new Date(),
+            growthPoints: Math.floor((withering.growthPoints ?? 0) / 2),
+          })
+          .where(eq(plantsTable.id, session.plantId));
+      }
+    } catch (err) {
+      logger.error({
+        msg: "Failed to wither plant after aborted session",
+        plantId: session.plantId,
+        error: err instanceof Error ? err.message : String(err),
       });
     }
   }
