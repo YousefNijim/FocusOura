@@ -37,7 +37,10 @@ export function toPlantType(value: unknown): PlantType {
   return isPlantType(value) ? value : "fern";
 }
 
-/** growthLevel is 1-based and uncapped; the art tops out at stage 4. */
+/** The art has four stages, and the API caps growthLevel to match. */
+export const MAX_PLANT_LEVEL = 4;
+
+/** growthLevel is 1-based; the art tops out at stage 4. */
 export function stageForGrowth(growthLevel: number): PlantStage {
   if (!Number.isFinite(growthLevel) || growthLevel < 1) return 1;
   return Math.min(4, Math.floor(growthLevel)) as PlantStage;

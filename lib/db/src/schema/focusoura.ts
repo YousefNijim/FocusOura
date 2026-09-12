@@ -72,6 +72,9 @@ export const plantsTable = pgTable("plants", {
   // Set when a session on this plant is aborted, cleared by the next
   // completed one. Null means healthy.
   witheredAt: timestamp("withered_at"),
+  // Study past the final level blooms the plant instead of levelling it, so a
+  // finished subject keeps earning without the plant pretending to still grow.
+  blooms: integer("blooms").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => {
   return {

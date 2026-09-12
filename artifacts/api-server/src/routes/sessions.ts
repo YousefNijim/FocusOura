@@ -20,8 +20,6 @@ import { requireVerified } from "../middleware/requireVerified.js";
 
 const router: IRouter = Router();
 
-const PLANT_INTERVAL_MINS = 25;
-const GROWTH_PER_PLANT    = 100;
 
 function calcPoints(actualMinutes: number, sessionType: string): number {
   const multiplier =
@@ -29,9 +27,11 @@ function calcPoints(actualMinutes: number, sessionType: string): number {
   return Math.floor(actualMinutes * multiplier);
 }
 
+// Growth accrues per minute. The old rule — floor(minutes / 25) * 100 — paid
+// nothing for a 24-minute session and counted a 49-minute one as a single
+// block, while the timer counted every minute and the coins still arrived.
 function calcGrowthPoints(actualMinutes: number): number {
-  const plantsEarned = Math.floor(actualMinutes / PLANT_INTERVAL_MINS);
-  return plantsEarned * GROWTH_PER_PLANT;
+  return Math.max(0, Math.round(actualMinutes * PLANT_GROWTH.POINTS_PER_MINUTE));
 }
 
 async function findOrCreatePlant(
@@ -59,16 +59,14 @@ async function findOrCreatePlant(
     return plantId;
   }
 
+  // One unsorted plant, not one per species. Creating a plant per species meant
+  // a user could grow eight of them without ever naming a subject, and those
+  // counted toward the pet — making the fastest route to it the one that skips
+  // everything the app is for.
   const existing = await db
     .select()
     .from(plantsTable)
-    .where(
-      and(
-        eq(plantsTable.userId, userId),
-        eq(plantsTable.plantType, plantType),
-        isNull(plantsTable.subjectId)
-      )
-    )
+    .where(and(eq(plantsTable.userId, userId), isNull(plantsTable.subjectId)))
     .limit(1);
 
   if (existing.length) return existing[0].id;
@@ -458,12 +456,19 @@ router.put("/:sessionId", async (req, res) => {
         const plant = plantData[0];
         let newPoints = (plant.growthPoints ?? 0) + growthPoints;
         let newLevel = plant.growthLevel ?? 1;
-        let maxPoints = plant.maxGrowthPoints ?? 100;
+        let maxPoints = plant.maxGrowthPoints ?? PLANT_GROWTH.BASE_MAX;
+        let blooms = plant.blooms ?? 0;
 
-        while (newPoints >= maxPoints) {
+        while (newPoints >= maxPoints && newLevel < PLANT_GROWTH.MAX_LEVEL) {
           newPoints -= maxPoints;
           newLevel += 1;
           maxPoints = PLANT_GROWTH.calculateNextMax(maxPoints);
+        }
+
+        // At the final level the plant is done growing; further study blooms it.
+        while (newLevel >= PLANT_GROWTH.MAX_LEVEL && newPoints >= maxPoints) {
+          newPoints -= maxPoints;
+          blooms += 1;
         }
 
         await db
@@ -472,6 +477,7 @@ router.put("/:sessionId", async (req, res) => {
             growthPoints: newPoints,
             growthLevel: newLevel,
             maxGrowthPoints: maxPoints,
+            blooms,
             // A finished session revives a withered plant.
             witheredAt: null,
           })
@@ -562,18 +568,40 @@ router.put("/:sessionId", async (req, res) => {
   if (state === "aborted" && session.plantId) {
     try {
       const [withering] = await db
-        .select({ growthPoints: plantsTable.growthPoints })
+        .select({
+          growthPoints: plantsTable.growthPoints,
+          growthLevel: plantsTable.growthLevel,
+          maxGrowthPoints: plantsTable.maxGrowthPoints,
+        })
         .from(plantsTable)
         .where(eq(plantsTable.id, session.plantId))
         .limit(1);
 
       if (withering) {
+        const points = withering.growthPoints ?? 0;
+        const level = withering.growthLevel ?? 1;
+        const max = withering.maxGrowthPoints ?? PLANT_GROWTH.BASE_MAX;
+
+        // Halving zero is not a penalty. A plant with nothing left to lose
+        // drops a level instead, which is what the garden, the stage art and
+        // the pet threshold all actually read.
+        const loss =
+          points > 0
+            ? { growthPoints: Math.floor(points / 2) }
+            : level > 1
+              ? (() => {
+                  const prevMax = PLANT_GROWTH.calculatePrevMax(max);
+                  return {
+                    growthLevel: level - 1,
+                    maxGrowthPoints: prevMax,
+                    growthPoints: Math.floor(prevMax / 2),
+                  };
+                })()
+              : {};
+
         await db
           .update(plantsTable)
-          .set({
-            witheredAt: new Date(),
-            growthPoints: Math.floor((withering.growthPoints ?? 0) / 2),
-          })
+          .set({ witheredAt: new Date(), ...loss })
           .where(eq(plantsTable.id, session.plantId));
       }
     } catch (err) {

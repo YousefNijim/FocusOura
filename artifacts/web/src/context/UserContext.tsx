@@ -36,6 +36,8 @@ export type Plant = {
   accentColor: string;
   /** True while the plant carries the mark of an abandoned session. */
   withered: boolean;
+  /** Study past the final level blooms the plant instead of levelling it. */
+  blooms: number;
 };
 
 export type PetMoodKey = "happy" | "neutral" | "sad";
