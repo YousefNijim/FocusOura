@@ -4,10 +4,10 @@ import { subjectsTable, plantsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { getUserId, ensureUser } from "./users.js";
 import { requireVerifiedOrOnboarding } from "../middleware/requireVerified.js";
+import { PLANT_TYPES, isPlantType } from "../lib/constants.js";
 
 const router: IRouter = Router();
 
-const PLANT_TYPES = ["fern", "succulent", "bamboo", "rose", "cactus", "bonsai", "orchid", "lavender"];
 
 router.get("/", async (req, res) => {
   const userId = getUserId(req);
@@ -38,6 +38,11 @@ router.post("/", requireVerifiedOrOnboarding, async (req, res) => {
   const { name, accentColor, plantType } = req.body;
   if (!name || !accentColor) {
     res.status(400).json({ error: "name and accentColor are required" });
+    return;
+  }
+
+  if (plantType !== undefined && !isPlantType(plantType)) {
+    res.status(400).json({ error: `plantType must be one of: ${PLANT_TYPES.join(", ")}` });
     return;
   }
 

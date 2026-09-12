@@ -8,7 +8,9 @@ import {
   json,
   index,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -72,6 +74,12 @@ export const plantsTable = pgTable("plants", {
   return {
     userIdIdx: index("plants_user_id_idx").on(table.userId),
     subjectIdIdx: index("plants_subject_id_idx").on(table.subjectId),
+    // The garden can only draw these eight. Without the constraint an unknown
+    // value is stored silently and renders as a fern forever.
+    plantTypeCheck: check(
+      "plants_plant_type_check",
+      sql`${table.plantType} in ('fern', 'succulent', 'bamboo', 'rose', 'cactus', 'bonsai', 'orchid', 'lavender')`,
+    ),
   };
 });
 
