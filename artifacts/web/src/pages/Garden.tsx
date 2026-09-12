@@ -14,25 +14,7 @@ import { fetchApi } from "@/utils/api";
 import { useToast } from "@/hooks/use-toast";
 import { getPetById, getPetMoodFromKey } from "@/constants/pets";
 
-import plantFern      from "@/assets/garden/plant-fern.png";
-import plantRose      from "@/assets/garden/plant-rose.png";
-import plantBamboo    from "@/assets/garden/plant-bamboo.png";
-import plantCactus    from "@/assets/garden/plant-cactus.png";
-import plantSucculent from "@/assets/garden/plant-succulent.png";
-import plantBonsai    from "@/assets/garden/plant-bonsai.png";
-import plantOrchid    from "@/assets/garden/plant-orchid.png";
-import plantLavender  from "@/assets/garden/plant-lavender.png";
-
-const PLANT_IMAGES: Record<string, string> = {
-  fern:      plantFern,
-  rose:      plantRose,
-  bamboo:    plantBamboo,
-  cactus:    plantCactus,
-  succulent: plantSucculent,
-  bonsai:    plantBonsai,
-  orchid:    plantOrchid,
-  lavender:  plantLavender,
-};
+import PlantArt, { PlantGroup, stageForGrowth, toPlantType } from "@/components/garden/PlantArt";
 
 type ViewMode = "day" | "week" | "month" | "year";
 type Session = {
@@ -153,25 +135,22 @@ function IsoGarden({ plants, subjects }: {
           return null;
         }
 
-        // Scale by growth level
-        const scale = plant.growthLevel >= 3 ? 1.0 : plant.growthLevel >= 2 ? 0.75 : 0.55;
-        const SIZE  = 90 * scale; // Increased size to match larger viewBox
-        const imgSrc = PLANT_IMAGES[plant.plantType ?? "fern"] ?? PLANT_IMAGES["fern"];
-
-        // Center the image on the tile top, anchored at the base
-        const ix = cx - SIZE / 2;
-        const iy = cy - SIZE + 10; // offset a bit to sit perfectly on grid cell
+        // The art already grows with the stage, so scale only nudges the
+        // footprint; the pot base sits on the tile at y = 228 in art units.
+        const WIDTH = 90;
+        const k     = WIDTH / 200;
 
         return (
-          <image
+          <g
             key={`plant-${row}-${col}`}
-            href={imgSrc}
-            x={ix}
-            y={iy}
-            width={SIZE}
-            height={SIZE}
+            transform={`translate(${cx - (200 * k) / 2}, ${cy + 10 - 228 * k}) scale(${k})`}
             style={{ filter: "drop-shadow(0px 6px 8px rgba(0,30,0,0.5))" }}
-          />
+          >
+            <PlantGroup
+              type={toPlantType(plant.plantType)}
+              stage={stageForGrowth(plant.growthLevel)}
+            />
+          </g>
         );
       })}
     </svg>
@@ -578,10 +557,10 @@ export default function Garden() {
                       /* ── Normal Plant Card ── */
                       <div className="p-3 flex items-center gap-3">
                         <div className="w-10 h-10 flex-shrink-0 relative">
-                          <img
-                            src={PLANT_IMAGES[(plant as any).plantType ?? "fern"] ?? PLANT_IMAGES["fern"]}
-                            alt={(plant as any).plantType ?? "plant"}
-                            className="w-full h-full object-contain drop-shadow-md"
+                          <PlantArt
+                            type={toPlantType((plant as any).plantType)}
+                            stage={stageForGrowth(plant.growthLevel)}
+                            className="w-full h-full drop-shadow-md"
                           />
                         </div>
                         <div className="flex-1 min-w-0">

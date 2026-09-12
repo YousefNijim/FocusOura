@@ -4,6 +4,8 @@ import { BottomNav } from "./BottomNav";
 import { useSession } from "@/context/SessionContext";
 import { PLANT_CATALOG } from "@/constants/plants";
 import { Timer, Zap } from "lucide-react";
+import PlantArt from "@/components/garden/PlantArt";
+import GardenDefs from "@/components/garden/GardenDefs";
 
 interface MobileLayoutProps {
   children: ReactNode;
@@ -35,7 +37,7 @@ function ActiveSessionBar() {
     >
       <div className="glass-strong rounded-2xl px-4 py-2.5 flex items-center gap-3 border border-primary/20 shadow-lg shadow-primary/10">
         <div className="relative flex-shrink-0">
-          <img src={plant.image} alt={plant.name} className="w-9 h-9 object-contain" />
+          <PlantArt type={plant.id} stage={4} className="w-9 h-9" />
           {!isPaused && (
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border border-background animate-pulse" />
           )}
@@ -69,6 +71,8 @@ export const MobileLayout = ({ children }: MobileLayoutProps) => {
 
   return (
     <div className="min-h-screen max-w-md mx-auto relative bg-background">
+      {/* Gradients and shapes every <PlantArt> on the page references. */}
+      <GardenDefs />
       <ActiveSessionBar />
       <main className={`pb-24 min-h-screen ${showBar ? "pt-16" : ""}`}>
         {children}

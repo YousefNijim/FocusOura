@@ -208,3 +208,57 @@ nav.fixed.bottom-0 {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }
 }
+
+/* ── Garden plant art ──────────────────────────────────────────────────────
+   Literal colours, not HSL triplets: these feed SVG fill/stroke directly.
+   Every gradient runs light from the upper left, which is what lets eight
+   species share one pot without looking collaged. */
+:root {
+  --leaf-dk: #1E5637;  --leaf-mid: #2E7A4C;  --leaf-hi: #57A86E;  --leaf-lt: #86C88F;
+  --stem: #2F6B43;     --stem-hi: #4C8F5C;
+  --pet-dk: #7E2338;   --pet-mid: #B03A52;   --pet-hi: #D9697F;   --pet-lt: #F0AEB9;
+  --pollen: #E6B54A;
+  --bark-dk: #43301F;  --bark-mid: #6B4A33;  --bark-hi: #96714D;
+  --cact-dk: #2A5B40;  --cact-mid: #3E7E56;  --cact-hi: #63A776;  --spine: #E4DCC6;
+  --succ-dk: #3D7355;  --succ-mid: #5E9B70;  --succ-hi: #94C398;  --succ-tip: #C9758A;
+  --orch-dk: #8E4E86;  --orch-mid: #C07FB4;  --orch-hi: #EBC3E2;  --orch-lip: #E8B93F;
+  --lav-dk: #4E3E86;   --lav-mid: #7B68B8;   --lav-hi: #AC9BD8;   --lav-leaf: #7E9484;
+  --bam-dk: #5E7A34;   --bam-mid: #86A548;   --bam-hi: #B0C76E;
+  --soil: #3E2F24;     --soil-hi: #55402F;   --moss: #4E7A3E;
+  --pot-lt: #A9A096;   --pot-mid: #8C8378;   --pot-dk: #6E665C;
+  --plant-shadow: #2A3A31;
+  --dead-dk: #4A4036;  --dead-mid: #6E6152;  --dead-hi: #8E8171;
+  --dead-leaf: #8A6438; --dead-pet: #9B5A62;
+}
+
+.dark {
+  --leaf-dk: #123A2B;  --leaf-mid: #1E5C45;  --leaf-hi: #2F8862;  --leaf-lt: #4FAE80;
+  --stem: #1F5138;     --stem-hi: #2F7A4F;
+  --pet-dk: #59182A;   --pet-mid: #8E2C45;   --pet-hi: #B85068;   --pet-lt: #D98A9C;
+  --pollen: #C99A3E;
+  --bark-dk: #2C2016;  --bark-mid: #4C3626;  --bark-hi: #6E5238;
+  --cact-dk: #1B4130;  --cact-mid: #2A5E41;  --cact-hi: #42805A;  --spine: #B9B39F;
+  --succ-dk: #274F3B;  --succ-mid: #3C6E50;  --succ-hi: #5E9370;  --succ-tip: #9A5468;
+  --orch-dk: #63325E;  --orch-mid: #8E5786;  --orch-hi: #B98FB1;  --orch-lip: #C39A34;
+  --lav-dk: #352A5E;   --lav-mid: #544593;   --lav-hi: #7C6CB0;   --lav-leaf: #54685C;
+  --bam-dk: #3F5323;   --bam-mid: #5D7433;   --bam-hi: #7C9049;
+  --soil: #241B14;     --soil-hi: #33271D;   --moss: #355830;
+  --pot-lt: #6C665E;   --pot-mid: #565049;   --pot-dk: #3C3832;
+  --plant-shadow: #000000;
+  --dead-dk: #2E2823;  --dead-mid: #463E35;  --dead-hi: #5F5548;
+  --dead-leaf: #6B4E2B; --dead-pet: #6B3B44;
+}
+
+.plant-sway {
+  transform-origin: 100px 232px;
+  animation: plant-sway 7s ease-in-out infinite;
+}
+
+@keyframes plant-sway {
+  0%, 100% { transform: rotate(-0.8deg); }
+  50%      { transform: rotate(0.8deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plant-sway { animation: none; }
+}

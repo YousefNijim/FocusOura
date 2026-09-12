@@ -5,6 +5,7 @@ import { fetchApi } from "@/utils/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PLANT_CATALOG } from "@/constants/plants";
+import PlantArt from "@/components/garden/PlantArt";
 
 const PLANT_TRAITS: Record<string, string> = {
   orchid:    "Exotic & rare — just like your dedication",
@@ -124,10 +125,8 @@ export default function StepTwo({ subjectName, accentColor, onNext }: StepTwoPro
               </AnimatePresence>
 
               {/* Plant image */}
-              <motion.img
-                src={plant.image}
-                alt={plant.name}
-                className="w-12 h-12 object-contain"
+              <motion.div
+                className="w-12 h-12"
                 // Bounce/pulse when selected
                 animate={isSelected
                   ? { scale: [1, 1.18, 0.95, 1.08, 1], y: [0, -4, 0] }
@@ -137,7 +136,9 @@ export default function StepTwo({ subjectName, accentColor, onNext }: StepTwoPro
                   : { duration: 0.15 }}
                 // Gentle hover lift
                 whileHover={!isSelected ? { y: -3, scale: 1.05 } : {}}
-              />
+              >
+                <PlantArt type={plant.id} stage={4} className="w-full h-full" />
+              </motion.div>
 
               <span className="text-[10px] font-medium text-foreground leading-tight text-center">
                 {plant.name}
