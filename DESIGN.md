@@ -58,7 +58,8 @@
 Bundle ID: `com.focusoura.app` | EAS Project: `660e5d47-78e3-4d62-982a-04136054c625`
 
 **Web deploy: Vercel — https://focusoura.vercel.app**
-**API deploy: Needs separate hosting (Railway/Render recommended) — see §6 for env vars**
+**API deploy: Railway — project `affectionate-eagerness`, service `@workspace/api-server`, region us-west2**
+**Database: Railway PostgreSQL 18.6 — service `Postgres`, reached over the private network (see §16)**
 
 ### Database / Shared Libs
 | Package | Version |
@@ -929,7 +930,7 @@ Base URL: `/api`
 ### Environment Variables
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | Supabase PostgreSQL connection string |
+| `DATABASE_URL` | PostgreSQL connection string. In production this is the Railway reference `${{Postgres.DATABASE_URL}}`, which resolves to the private-network host `postgres.railway.internal:5432` |
 | `GOOGLE_API_KEY` | Firebase + Gemini API key |
 | `JWT_SECRET` | JWT signing secret — **required**, server throws on startup if missing |
 | `PORT` | API server port (default: 8080) |
@@ -1502,7 +1503,7 @@ Defined relative to `--radius: 1rem` (16px):
 
 ### Migration SQL — Run on Railway PostgreSQL
 
-> ⚠️ Run these statements in your Railway database console or via `psql`. All use `IF NOT EXISTS` — safe to run multiple times.
+> ✅ **Superseded on 2026-09-12.** The database these statements targeted no longer exists. The current database was created from the Drizzle schema in one pass — see §16. Kept for history; do not run.
 
 ```sql
 -- ── 1. Users: new columns ────────────────────────────────────────
@@ -1596,7 +1597,7 @@ CREATE INDEX IF NOT EXISTS "evt_user_id_idx"    ON "email_verification_tokens" (
 
 **Fix applied**: Migration file `artifacts/api-server/migrations/003_fix_calendar_items.sql` drops and recreates the table with the correct `id TEXT PRIMARY KEY`. Safe to run — table was newly created with no user data.
 
-**Migration to run on Railway:**
+**Migration to run on Railway:** ✅ Superseded on 2026-09-12 — `calendar_items` is created with `id text PRIMARY KEY` directly from the Drizzle schema. See §16.
 
 ```sql
 -- Run: railway run psql $DATABASE_URL -f artifacts/api-server/migrations/003_fix_calendar_items.sql
@@ -1681,3 +1682,85 @@ After these changes a new EAS build is required (native code changed — `expo-w
 ```
 eas build --platform android --profile preview
 ```
+
+---
+
+## 16. Infrastructure — Production Rebuild (2026-09-12)
+
+The API had not deployed successfully since 2026-05-08 and the production database was gone. This section is the current state of production; earlier infrastructure notes in this document describe a setup that no longer exists.
+
+### What was wrong
+
+| Problem | Root cause |
+|---|---|
+| Database unreachable | The Supabase project `gkvixsyvkydtfqslnpgb` no longer existed — the pooler answered `FATAL: tenant/user not found`. It was not paused or misconfigured; it was gone. |
+| Build failing since 2026-05-08 | `overrides` lives in `pnpm-workspace.yaml`, a pnpm 10 feature. With no `packageManager` field, Railpack chose its own pnpm, read no overrides from config, and rejected the lockfile that records them (`ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`). Railway's own diagnosis blamed a stale lockfile; that was wrong — `pnpm install --frozen-lockfile` passed locally on pnpm 10.33.2. |
+| Second build failure behind the first | `expo-web-browser` was added to `artifacts/mobile/package.json` without regenerating the lockfile (`ERR_PNPM_OUTDATED_LOCKFILE`). |
+| No deployment on push | `watchPatterns` was `["artifacts/api-server"]`, so commits touching the root lockfile, `package.json`, or `lib/` were skipped entirely. Deployments showed as `SKIPPED`, not failed, which is easy to miss. |
+
+### Current production setup
+
+**Railway project `affectionate-eagerness`, environment `production`, region us-west2**
+
+| Service | Detail |
+|---|---|
+| `@workspace/api-server` | Source `YousefNijim/FocusOura` branch `master`, builder RAILPACK, Node 22.23.2 |
+| | Build `pnpm --filter @workspace/api-server build` · Start `pnpm --filter @workspace/api-server start` |
+| | Watch patterns `artifacts/api-server/**`, `lib/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml` |
+| | Public domain `workspaceapi-server-production-198a.up.railway.app` → port 8080 |
+| `Postgres` | `ghcr.io/railwayapp-templates/postgres-ssl:18` — PostgreSQL 18.6 |
+| | Volume `postgres-volume` (5 GB) at `/var/lib/postgresql/data`, `PGDATA=/var/lib/postgresql/data/pgdata` |
+| | No TCP proxy — reachable only from inside the project's private network |
+
+The API reaches the database through the Railway reference variable `DATABASE_URL = ${{Postgres.DATABASE_URL}}`, which resolves to `postgres.railway.internal:5432`. Observed query latency is 2–25 ms.
+
+### How the schema was created
+
+The old backup (`focusoura_db_backup.sql`) held only 14 of the 20 tables the code defines — it predated `store_items`, `user_inventory`, `calendar_items`, `push_tokens`, `password_reset_tokens` and `email_verification_tokens`. The accounts in it were test accounts, so it was not restored.
+
+The schema was generated from the Drizzle schema instead, which is the source of truth:
+
+```bash
+pnpm --filter @workspace/db exec drizzle-kit generate \
+  --dialect postgresql --schema ./src/schema/index.ts --out <dir>
+```
+
+That produced 20 `CREATE TABLE` statements and 25 explicit indexes, already including every column the older "pending migration" sections in this document were waiting on (`paused_at`, `total_paused_ms`, `pause_count`, `onboarding_completed`, `email_verified`, `email_verified_at`). Final state: 20 tables, 50 indexes (25 explicit + primary keys + unique constraints).
+
+### Operating the database
+
+There is no public endpoint, so the only access is the **Console** tab on the Postgres service. Two things about that shell are worth knowing before using it:
+
+- `PGHOST` is set to the private domain, so a bare `psql -U postgres` connects over **TCP and demands a password** rather than using the local socket. Pass `-h /var/run/postgresql` to force the socket, which authenticates as `trust` and works even when the password is wrong or unknown.
+- `psql` does **not** interpolate `:'var'` inside `-c`. Pipe the statement through stdin instead.
+
+Rotating the database password correctly — `POSTGRES_PASSWORD` only applies at `initdb`, so changing the variable alone leaves the role password untouched and silently breaks the app:
+
+```bash
+# 1. set POSTGRES_PASSWORD in Railway, wait for the Postgres service to redeploy
+# 2. in the Postgres Console, make the role match the variable:
+echo "ALTER USER postgres WITH PASSWORD :'pw';" \
+  | psql -h /var/run/postgresql -U postgres -d railway -v pw="$POSTGRES_PASSWORD"
+# 3. redeploy @workspace/api-server so it re-resolves DATABASE_URL
+```
+
+Step 3 is required: environment variables are injected when a container starts, so a running API keeps the old password until it is redeployed. Railway does not redeploy the dependent service automatically.
+
+**Use an alphanumeric password.** `DATABASE_URL` is assembled as `postgresql://user:PASSWORD@host:5432/db`, and a `/`, `@`, `:` or `+` in the password breaks URI parsing — the failure looks identical to a wrong password, and `PGPASSWORD=... psql -h ...` succeeding while `psql "$DATABASE_URL"` fails is the signal that distinguishes them.
+
+### Security
+
+`.env` was tracked from the first commit of a **public** repository, exposing `JWT_SECRET`, `GOOGLE_API_KEY` and `DATABASE_URL`. `JWT_SECRET` was the severe one: it allows forging a token for any account, including an admin.
+
+Actions taken: `JWT_SECRET`, the Google API key and the database password were all rotated. Untracking `.env` and switching `--env-file` to `--env-file-if-exists` is [PR #3](https://github.com/YousefNijim/FocusOura/pull/3). Note that untracking does not remove the file from history — rotation is what closed the exposure.
+
+Two related notes:
+
+- Node does not let an env file override variables already present in the environment, so Railway's injected `DATABASE_URL` won over the dead Supabase URL inside the committed `.env`. This is why the service ran at all.
+- `GOOGLE_API_KEY` is served to every browser by `GET /api/config/firebase` (correct — a Firebase web key is public by design) **and** used server-side for Gemini in `lib/integrations-gemini-ai`. Anyone can read it from the network tab and call Gemini with it. No billing is attached to the Google Cloud project today, so the exposure is quota rather than money — but the keys must be split before billing is enabled. Restricting the Firebase key to Identity Toolkit and Token Service also neutralises it.
+
+### Still open
+
+- Split the Gemini key out of `GOOGLE_API_KEY` into its own server-only variable — before enabling billing.
+- `PATCH /calendar/:id` and `DELETE /calendar/:id` still have no try/catch; a DB error there returns an opaque 500, the same failure mode §12 fixed for `GET` and `POST`.
+- `artifacts/api-server/migrations/` holds ad-hoc SQL files. Generated Drizzle migrations would prevent the schema drift that made this rebuild necessary.
