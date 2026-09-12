@@ -7,6 +7,8 @@ import {
 import { eq, or, and, desc, inArray, gt, lt, lte, sql, gte } from "drizzle-orm";
 import { sendPushNotification } from "../lib/push.js";
 import { requireVerified } from "../middleware/requireVerified.js";
+import { describeDbError } from "../lib/dbError.js";
+import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 
@@ -155,7 +157,17 @@ async function enrichChallenge(ch: typeof challengesTable.$inferSelect, userId: 
 // ─── GET /api/challenges ──────────────────────────────────────────────────────
 router.get("/", async (req, res) => {
   const userId = getUserId(req);
-  await resolveExpiredChallenges();
+
+  // Resolving expired challenges is housekeeping that happens to run on read.
+  // It was awaited bare, so when its query failed the whole Arena page died
+  // with "Couldn't load challenges. Check your connection" — blaming the user's
+  // network for a server fault. A failure here now costs the auto-resolution,
+  // not the listing.
+  try {
+    await resolveExpiredChallenges();
+  } catch (err) {
+    logger.error({ msg: "Failed to resolve expired challenges", error: describeDbError(err) });
+  }
 
   const myParticipations = await db
     .select()
