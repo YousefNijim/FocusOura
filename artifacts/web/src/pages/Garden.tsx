@@ -10,11 +10,12 @@ import {
   startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
 } from "date-fns";
 import { useUser } from "@/context/UserContext";
+import type { Plant } from "@/context/UserContext";
 import { fetchApi, describeApiError } from "@/utils/api";
 import { useToast } from "@/hooks/use-toast";
 import { getPetById, getPetMoodFromKey } from "@/constants/pets";
 
-import PlantArt, { PlantGroup, stageForGrowth, toPlantType } from "@/components/garden/PlantArt";
+import PlantArt, { stageForGrowth, toPlantType } from "@/components/garden/PlantArt";
 
 type ViewMode = "day" | "week" | "month" | "year";
 type Session = {
@@ -27,133 +28,107 @@ const colorOptions = [
   "#2D6A4F","#52B788","#74C69D","#B7E4C7","#95D5B2","#40916C","#1B4332","#E9C46A",
 ];
 
-// ─── Isometric Garden SVG ─────────────────────────────────────────────────────
-function IsoGarden({ plants, subjects }: {
-  plants: { id: string; growthLevel: number; subjectId: string; plantType?: string; withered?: boolean }[];
-  subjects: { id: string; name: string; accentColor: string }[];
-}) {
-  const GRID_N = 8;
-  const ORIG_X = 340;
-  const ORIG_Y = 130;
-  const STEP_X = 35;
-  const STEP_Y = 18.75;
-  
-  const tiles = useMemo(() => {
-    const t = [];
-    for (let row = 0; row < GRID_N; row++) {
-      for (let col = 0; col < GRID_N; col++) {
-        const cx = ORIG_X + (col - row) * STEP_X;
-        const cy = ORIG_Y + (col + row + 1) * STEP_Y; // Center of the tile
-        t.push({ row, col, cx, cy });
-      }
-    }
-    return t.sort((a, b) => (a.row + a.col) - (b.row + b.col));
-  }, []);
+// ─── Potting Shelf ────────────────────────────────────────────────────────────
+// The plants are drawn as a front elevation and every one of them sits in a
+// pot, so they stand on shelves. The previous scene placed them on an
+// isometric lawn, where a face-on pot floats above its tile instead of resting
+// on it, and its colours were hard-coded so the ground stayed bright green in
+// night mode while the plants went teal.
+const POTS_PER_SHELF = 3;
 
-  const plantMap = useMemo(() => {
-    const m = new Map<string, typeof plants[number]>();
-    plants.slice(0, GRID_N * GRID_N).forEach((p, i) => {
-      m.set(`${Math.floor(i / GRID_N)}-${i % GRID_N}`, p);
-    });
-    return m;
-  }, [plants]);
+function PottingShelf({
+  plants,
+  subjects,
+  onSelect,
+  onAdd,
+}: {
+  plants: Plant[];
+  subjects: { id: string; name: string; accentColor: string }[];
+  onSelect: (plant: Plant) => void;
+  onAdd: () => void;
+}) {
+  // One trailing slot invites the next subject, so a full shelf still shows
+  // where the next plant would go.
+  const slots: (Plant | null)[] = [...plants, null];
+  const shelves: (Plant | null)[][] = [];
+  for (let i = 0; i < slots.length; i += POTS_PER_SHELF) {
+    shelves.push(slots.slice(i, i + POTS_PER_SHELF));
+  }
 
   return (
-    <svg
-      width="100%"
-      viewBox="0 0 680 500"
-      style={{ display: "block", overflow: "visible" }}
-    >
-      <defs>
-        <clipPath id="grassClip">
-          <polygon points="60,280 340,130 620,280 340,430"/>
-        </clipPath>
-      </defs>
+    <div className="flex flex-col gap-5">
+      {shelves.map((shelf, shelfIndex) => (
+        <div key={shelfIndex}>
+          <div className="grid grid-cols-3 gap-1.5 items-end px-1.5">
+            {shelf.map((plant, i) =>
+              plant ? (
+                <button
+                  key={plant.id}
+                  onClick={() => onSelect(plant)}
+                  className="group rounded-t-xl transition-transform duration-200 hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  aria-label={`${subjects.find((s) => s.id === plant.subjectId)?.name ?? "General"} plant`}
+                >
+                  <PlantArt
+                    type={toPlantType(plant.plantType)}
+                    stage={plant.withered ? "withered" : stageForGrowth(plant.growthLevel)}
+                    className="w-full h-auto max-h-[130px]"
+                  />
+                </button>
+              ) : (
+                <button
+                  key={`add-${shelfIndex}-${i}`}
+                  onClick={onAdd}
+                  className="flex flex-col items-center justify-end gap-2 h-[130px] text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <span className="w-[54px] h-[34px] rounded-t-[3px] rounded-b-xl border-[1.5px] border-dashed border-border group-hover:border-primary flex items-center justify-center text-lg leading-none">
+                    +
+                  </span>
+                  <span className="text-[10px]">Add subject</span>
+                </button>
+              ),
+            )}
+          </div>
 
-      {/* Soil Base */}
-      <polygon points="60,280 340,430 340,468 60,318" fill="#8B5E3C" />
-      <polygon points="60,280 340,430 340,468 60,318" fill="#5a3010" opacity="0.25" />
-      <polygon points="340,430 620,280 620,318 340,468" fill="#6B4220" />
-      <polygon points="340,430 620,280 620,318 340,468" fill="#3a1e08" opacity="0.3" />
+          {/* the plank the pots stand on */}
+          <div
+            className="h-3 rounded-[3px]"
+            style={{
+              background: "linear-gradient(var(--shelf-top) 0 4px, var(--shelf-face) 4px 100%)",
+              borderBottom: "3px solid var(--shelf-edge)",
+              boxShadow: "0 5px 10px -4px var(--shelf-shadow)",
+            }}
+          />
 
-      {/* Soil bottom edge */}
-      <line x1="60" y1="318" x2="340" y2="468" stroke="#4a2e10" strokeWidth="1.5" />
-      <line x1="340" y1="468" x2="620" y2="318" stroke="#3a1e08" strokeWidth="1.5" />
-
-      {/* Grass Surface */}
-      <polygon points="60,280 340,130 620,280 340,430" fill="#5bbf5b" />
-      {/* Highlight top-left */}
-      <polygon points="60,280 340,130 480,205 200,355" fill="#70d070" opacity="0.3" />
-      {/* Shadow bottom-right */}
-      <polygon points="480,205 620,280 340,430 200,355" fill="#3a9e3a" opacity="0.15" />
-
-      {/* Grid Lines */}
-      <g clipPath="url(#grassClip)" stroke="#3d9e3d" strokeWidth="0.8" opacity="0.55">
-        {/* Lines parallel to LEFT edge */}
-        <line x1="375" y1="148.75" x2="95" y2="298.75" />
-        <line x1="410" y1="167.5" x2="130" y2="317.5" />
-        <line x1="445" y1="186.25" x2="165" y2="336.25" />
-        <line x1="480" y1="205" x2="200" y2="355" />
-        <line x1="515" y1="223.75" x2="235" y2="373.75" />
-        <line x1="550" y1="242.5" x2="270" y2="392.5" />
-        <line x1="585" y1="261.25" x2="305" y2="411.25" />
-        <line x1="620" y1="280" x2="340" y2="430" />
-
-        {/* Lines parallel to RIGHT edge */}
-        <line x1="340" y1="130" x2="620" y2="280" />
-        <line x1="305" y1="148.75" x2="585" y2="298.75" />
-        <line x1="270" y1="167.5" x2="550" y2="317.5" />
-        <line x1="235" y1="186.25" x2="515" y2="336.25" />
-        <line x1="200" y1="205" x2="480" y2="355" />
-        <line x1="165" y1="223.75" x2="445" y2="373.75" />
-        <line x1="130" y1="242.5" x2="410" y2="392.5" />
-        <line x1="95" y1="261.25" x2="375" y2="411.25" />
-        <line x1="60" y1="280" x2="340" y2="430" />
-      </g>
-
-      {/* Grass Border */}
-      <polygon points="60,280 340,130 620,280 340,430" fill="none" stroke="#3a9e3a" strokeWidth="1.8" />
-
-      {/* Soil top edge highlight */}
-      <line x1="60" y1="280" x2="340" y2="430" stroke="#a07050" strokeWidth="1.2" opacity="0.7" />
-      <line x1="340" y1="430" x2="620" y2="280" stroke="#805030" strokeWidth="1.2" opacity="0.7" />
-
-      {/* ── Plants layer ── */}
-      {tiles.map(({ row, col, cx, cy }) => {
-        const plant = plantMap.get(`${row}-${col}`);
-        if (!plant) {
-          // Subtle grass blades on empty tiles
-          const seed = (row * 13 + col * 7) % 4;
-          if (seed < 2) {
-            return (
-              <g key={`grass-${row}-${col}`}>
-                <ellipse cx={cx - 6} cy={cy + 5} rx="3.5" ry="1.5" fill="#4FA82E" opacity="0.4" />
-                <ellipse cx={cx + 6} cy={cy + 6} rx="3" ry="1.2"    fill="#4FA82E" opacity="0.4" />
-              </g>
-            );
-          }
-          return null;
-        }
-
-        // The art already grows with the stage, so scale only nudges the
-        // footprint; the pot base sits on the tile at y = 228 in art units.
-        const WIDTH = 90;
-        const k     = WIDTH / 200;
-
-        return (
-          <g
-            key={`plant-${row}-${col}`}
-            transform={`translate(${cx - (200 * k) / 2}, ${cy + 10 - 228 * k}) scale(${k})`}
-            style={{ filter: "drop-shadow(0px 6px 8px rgba(0,30,0,0.5))" }}
-          >
-            <PlantGroup
-              type={toPlantType(plant.plantType)}
-              stage={plant.withered ? "withered" : stageForGrowth(plant.growthLevel)}
-            />
-          </g>
-        );
-      })}
-    </svg>
+          <div className="grid grid-cols-3 gap-1.5 px-1.5 mt-2.5">
+            {shelf.map((plant, i) => {
+              if (!plant) return <div key={`gap-${shelfIndex}-${i}`} />;
+              const subject = subjects.find((s) => s.id === plant.subjectId);
+              const pct = Math.min(
+                100,
+                Math.round((plant.growthPoints / Math.max(1, plant.maxGrowthPoints)) * 100),
+              );
+              return (
+                <div key={`meta-${plant.id}`} className="text-center min-w-0">
+                  <p className="text-[11px] font-medium truncate">{subject?.name ?? "General"}</p>
+                  <p className="text-[9.5px] font-mono text-muted-foreground tabular-nums">
+                    {plant.withered ? "withered" : `Lv ${plant.growthLevel} · ${pct}%`}
+                  </p>
+                  <div className="w-[70%] mx-auto h-[3px] rounded-sm bg-border overflow-hidden mt-1">
+                    <div
+                      className="h-full rounded-sm"
+                      style={{
+                        width: `${pct}%`,
+                        background: plant.withered ? "var(--dead-mid)" : subject?.accentColor ?? "var(--accent)",
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -347,56 +322,31 @@ export default function Garden() {
         )}
 
         {/* ── Isometric Garden ── */}
-        <div className="relative rounded-3xl overflow-hidden"
-          style={{ background: "linear-gradient(160deg,#1a3d10 0%,#0f2a08 100%)", minHeight: "270px" }}
+        <div
+          className="rounded-3xl border border-border p-4 pb-3"
+          style={{ background: "var(--garden-wall)" }}
         >
-          {/* Stars/sky dots */}
-          <div className="absolute inset-0 overflow-hidden opacity-30">
-            {[...Array(18)].map((_, i) => (
-              <div key={i} className="absolute w-0.5 h-0.5 rounded-full bg-white"
-                style={{ left: `${(i * 37 + 11) % 100}%`, top: `${(i * 19 + 7) % 45}%`, opacity: 0.4 + (i % 3) * 0.2 }}
-              />
-            ))}
+          <div className="flex items-baseline justify-between mb-3">
+            <span className="text-[10px] font-mono tracking-widest uppercase text-muted-foreground">
+              Garden {new Date().getFullYear()}
+            </span>
+            <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
+              {plants.length} planted · {stats?.fullyGrownCount ?? 0} grown
+            </span>
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center" style={{ minHeight: "270px" }}>
-              <div className="w-8 h-8 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-            </div>
-          ) : plants.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3" style={{ minHeight: "270px" }}>
-              <div className="text-5xl animate-bounce">🌱</div>
-              <p className="text-white/80 text-sm font-semibold">Your garden is empty</p>
-              <p className="text-white/50 text-xs">Add a subject &amp; complete a focus session</p>
-              <button
-                onClick={() => setShowAdd(true)}
-                className="mt-1 flex items-center gap-1.5 bg-white/20 backdrop-blur-sm text-white text-xs font-semibold px-4 py-2 rounded-full hover:bg-white/30 transition-all"
-              >
-                <Plus size={13} /> Add a Subject
-              </button>
+            <div className="flex items-center justify-center" style={{ minHeight: "200px" }}>
+              <div className="w-8 h-8 rounded-full border-2 border-border border-t-primary animate-spin" />
             </div>
           ) : (
-            <div className="px-2 pt-2 pb-1">
-              <IsoGarden plants={plants} subjects={subjects} />
-            </div>
+            <PottingShelf
+              plants={plants}
+              subjects={subjects}
+              onSelect={startEdit}
+              onAdd={() => setShowAdd(true)}
+            />
           )}
-
-          {/* Stats overlay */}
-          <div className="absolute bottom-3 right-4 flex items-center gap-3">
-            <div className="flex items-center gap-1.5 bg-black/30 backdrop-blur-sm rounded-full px-3 py-1">
-              <span className="text-green-300 text-sm">🌿</span>
-              <span className="text-white/90 text-sm font-bold">{plants.length}</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-black/30 backdrop-blur-sm rounded-full px-3 py-1">
-              <span className="text-yellow-300 text-sm">⭐</span>
-              <span className="text-white/90 text-sm font-bold">{stats?.fullyGrownCount ?? 0}</span>
-            </div>
-          </div>
-
-          {/* Garden label */}
-          <div className="absolute top-3 left-4">
-            <span className="text-white/50 text-xs font-mono">GARDEN {new Date().getFullYear()}</span>
-          </div>
         </div>
 
         {/* View Tabs */}
