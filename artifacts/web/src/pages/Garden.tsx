@@ -465,7 +465,11 @@ export default function Garden() {
               {plants.map((plant) => {
                 const subject = subjects.find((s) => s.id === plant.subjectId);
                 const progress = Math.min(100, Math.round((plant.growthPoints / plant.maxGrowthPoints) * 100));
-                const isEditing = editingSubjectId === plant.subjectId;
+                // The General plant has no subject, so its subjectId is null — and so
+                // is the initial editing state. Comparing them directly made
+                // `null === null` true, which opened the edit panel on every account
+                // from first render, with the delete confirmation already armed.
+                const isEditing = plant.subjectId != null && editingSubjectId === plant.subjectId;
                 return (
                   <div key={plant.id} className="glass rounded-2xl border border-border overflow-hidden relative">
                     {isEditing ? (
@@ -486,7 +490,7 @@ export default function Garden() {
                             />
                           ))}
                         </div>
-                        {deleteConfirm === plant.subjectId ? (
+                        {plant.subjectId != null && deleteConfirm === plant.subjectId ? (
                           <div className="space-y-1.5">
                             <p className="text-[10px] text-destructive font-medium">Delete this subject and its plant?</p>
                             <div className="flex gap-1.5">

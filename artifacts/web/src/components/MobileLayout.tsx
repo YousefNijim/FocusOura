@@ -74,7 +74,9 @@ export const MobileLayout = ({ children }: MobileLayoutProps) => {
       {/* Gradients and shapes every <PlantArt> on the page references. */}
       <GardenDefs />
       <ActiveSessionBar />
-      <main className={`pb-24 min-h-screen ${showBar ? "pt-16" : ""}`}>
+      {/* pb-32: the bottom nav is ~5.5rem with its safe-area inset, and pb-24
+          left the last row of Profile and Shop underneath it. */}
+      <main className={`pb-32 min-h-screen ${showBar ? "pt-16" : ""}`}>
         {children}
       </main>
       <BottomNav />

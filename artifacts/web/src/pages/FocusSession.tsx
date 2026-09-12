@@ -272,6 +272,10 @@ export default function FocusSession() {
   // Pause tracking — pauseCountRef keeps the latest count for the auto-complete closure
   const pauseCountRef                         = useRef(0);
   const [pauseCount, setPauseCount]           = useState(0);
+  // Abandoning a session and finishing one used to land on the same green
+  // "Done!" screen, so cancelling read as an achievement and said nothing about
+  // the plant it had just withered.
+  const [aborted, setAborted] = useState(false);
   const [completionPauseCount, setCompletionPauseCount] = useState(0);
   const [completionActualMins, setCompletionActualMins] = useState(0);
 
@@ -328,6 +332,7 @@ export default function FocusSession() {
       setCompletionActualMins(info.actualMinutes);
       setCompletionPauseCount(pauseCountRef.current);
       setWasCompleted(true);
+      setAborted(false);
       setDone(true);
       setSound("off");
       toast({ title: "Session complete!", description: "Time's up — great focus session!" });
@@ -423,6 +428,7 @@ export default function FocusSession() {
           setReceivedMessage({ id: "fallback", content: "Every session you complete is a step forward. Keep going — you're building something great!", source: "system" });
         });
       setWasCompleted(true);
+      setAborted(false);
       setDone(true);
       toast({
         title: "Session complete!",
@@ -432,6 +438,7 @@ export default function FocusSession() {
       });
     } catch {
       toast({ title: "Session saved", description: "Great work!" });
+      setAborted(false);
       setDone(true);
     } finally {
       setLoading(false);
@@ -447,12 +454,12 @@ export default function FocusSession() {
       setPlants(updated);
       await refreshData();
       if (currentSessionId) setLastSessionId(currentSessionId);
+      setAborted(true);
       setDone(true);
       toast({
-        title: "Session stopped",
-        description: earned > 0
-          ? `${actualMinutes} min studied. ${earned} plant${earned > 1 ? "s" : ""} grew!`
-          : `${actualMinutes} min recorded. Need 25 min to earn a plant.`,
+        title: "Session cancelled",
+        description: `${actualMinutes} min recorded. Your plant withered and lost half its progress.`,
+        variant: "destructive",
       });
     } catch {
       toast({ title: "Error", description: "Could not save session", variant: "destructive" });
@@ -463,6 +470,7 @@ export default function FocusSession() {
 
   const resetSession = () => {
     setDone(false);
+    setAborted(false);
     setReceivedMessage(null);
     setMessageText("");
     setMessageSent(false);
@@ -652,14 +660,27 @@ export default function FocusSession() {
             </div>
           )}
 
-          {/* Done */}
+          {/* Done — an unfinished ring and a withered plant for a cancelled session */}
           {isDone && (
-            <ProgressRing progress={1}>
-              <PlantArt type={activePlantType} stage={4} className="w-14 h-14 mb-0.5" />
-              <span className="text-xl font-bold text-primary font-mono">Done!</span>
+            <ProgressRing progress={aborted ? 0 : 1}>
+              <PlantArt
+                type={activePlantType}
+                stage={aborted ? "withered" : 4}
+                className="w-14 h-14 mb-0.5"
+              />
+              <span
+                className={`text-xl font-bold font-mono ${aborted ? "text-muted-foreground" : "text-primary"}`}
+              >
+                {aborted ? "Cancelled" : "Done!"}
+              </span>
               <span className="text-[11px] text-muted-foreground mt-0.5">
                 {completionActualMins > 0 ? `${completionActualMins}m studied` : `${actualElapsedMins}m studied`}
               </span>
+              {aborted && (
+                <span className="text-[10px] text-destructive mt-1 px-4 text-center leading-tight">
+                  Your plant withered and lost half its progress
+                </span>
+              )}
             </ProgressRing>
           )}
 

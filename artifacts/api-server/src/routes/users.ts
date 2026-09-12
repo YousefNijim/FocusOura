@@ -245,7 +245,12 @@ router.get(["/", "/stats"], async (req, res) => {
     plantCount: allPlants.length,
     fullyGrownCount,
     petUnlocked,
-    lastSessionDate: stats.lastSessionDate?.toISOString() ?? null,
+    // MAX(timestamp) arrives from the driver as a string; the sql<Date> above
+    // is a type assertion, not a conversion. Calling .toISOString() on it threw
+    // and took the whole endpoint down, which the dashboard rendered as zeros.
+    lastSessionDate: stats.lastSessionDate
+      ? new Date(stats.lastSessionDate).toISOString()
+      : null,
     petMood,
   });
 });

@@ -36,6 +36,12 @@ minimumReleaseAgeExclude:
 
 packages:
   - artifacts/*
+  # The Expo app is deliberately outside the workspace. Expo relativises the
+  # bundle entry against the package but resolves it against the workspace
+  # root, so in a workspace the release build fails with
+  #   Unable to resolve module ./index.ts from <repo>/.
+  # It has its own package-lock.json and installs with npm.
+  - '!artifacts/mobile'
   - lib/*
   - lib/integrations/*
   - scripts

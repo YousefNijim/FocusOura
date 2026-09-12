@@ -72,7 +72,11 @@ export function VerificationBanner() {
                                  "Resend email";
 
   return (
-    <div className="fixed top-0 inset-x-0 z-[100]">
+    // Sticky rather than fixed: fixed took the banner out of the flow, so it
+    // covered the top of every page — "Welcome, YOUSEF" and "My Garden" were
+    // both sliced through. Sticky keeps it pinned while scrolling and still
+    // reserves its own height.
+    <div className="sticky top-0 inset-x-0 z-[100]">
       <div className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2.5 text-sm font-medium shadow-md">
         <Mail size={15} className="flex-shrink-0 shrink-0" />
         <span className="flex-1 min-w-0 truncate">
