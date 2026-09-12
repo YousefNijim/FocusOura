@@ -29,10 +29,13 @@ export type Plant = {
   id: string;
   subjectId: string;
   subjectName: string;
+  plantType: string;
   growthLevel: number;
   growthPoints: number;
   maxGrowthPoints: number;
   accentColor: string;
+  /** True while the plant carries the mark of an abandoned session. */
+  withered: boolean;
 };
 
 export type PetMoodKey = "happy" | "neutral" | "sad";

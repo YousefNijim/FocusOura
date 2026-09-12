@@ -67,6 +67,9 @@ export const plantsTable = pgTable("plants", {
   growthLevel: integer("growth_level").notNull().default(1),
   growthPoints: integer("growth_points").notNull().default(0),
   maxGrowthPoints: integer("max_growth_points").notNull().default(100),
+  // Set when a session on this plant is aborted, cleared by the next
+  // completed one. Null means healthy.
+  witheredAt: timestamp("withered_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => {
   return {

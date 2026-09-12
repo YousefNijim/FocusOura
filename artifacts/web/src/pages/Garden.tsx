@@ -29,7 +29,7 @@ const colorOptions = [
 
 // ─── Isometric Garden SVG ─────────────────────────────────────────────────────
 function IsoGarden({ plants, subjects }: {
-  plants: { id: string; growthLevel: number; subjectId: string; plantType?: string }[];
+  plants: { id: string; growthLevel: number; subjectId: string; plantType?: string; withered?: boolean }[];
   subjects: { id: string; name: string; accentColor: string }[];
 }) {
   const GRID_N = 8;
@@ -148,7 +148,7 @@ function IsoGarden({ plants, subjects }: {
           >
             <PlantGroup
               type={toPlantType(plant.plantType)}
-              stage={stageForGrowth(plant.growthLevel)}
+              stage={plant.withered ? "withered" : stageForGrowth(plant.growthLevel)}
             />
           </g>
         );
@@ -559,7 +559,7 @@ export default function Garden() {
                         <div className="w-10 h-10 flex-shrink-0 relative">
                           <PlantArt
                             type={toPlantType((plant as any).plantType)}
-                            stage={stageForGrowth(plant.growthLevel)}
+                            stage={(plant as any).withered ? "withered" : stageForGrowth(plant.growthLevel)}
                             className="w-full h-full drop-shadow-md"
                           />
                         </div>

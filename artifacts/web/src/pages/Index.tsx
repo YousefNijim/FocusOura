@@ -185,7 +185,7 @@ const Dashboard = () => {
             >
               <PlantArt
                 type={toPlantType((firstPlant as any).plantType)}
-                stage={stageForGrowth(firstPlant.growthLevel)}
+                stage={firstPlant.withered ? "withered" : stageForGrowth(firstPlant.growthLevel)}
                 className="w-[72px] h-[72px] animate-float"
               />
               <p className="text-sm font-medium text-foreground mt-3">{firstSubject.name}</p>

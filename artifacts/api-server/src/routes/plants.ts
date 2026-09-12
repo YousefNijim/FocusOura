@@ -21,6 +21,7 @@ router.get("/", async (req, res) => {
       growthLevel: plantsTable.growthLevel,
       growthPoints: plantsTable.growthPoints,
       maxGrowthPoints: plantsTable.maxGrowthPoints,
+      witheredAt: plantsTable.witheredAt,
       createdAt: plantsTable.createdAt,
     })
     .from(plantsTable)
@@ -37,6 +38,7 @@ router.get("/", async (req, res) => {
       growthPoints: p.growthPoints,
       maxGrowthPoints: p.maxGrowthPoints,
       accentColor: p.accentColor ?? "#4CAF50",
+      withered: p.witheredAt !== null,
       createdAt: p.createdAt?.toISOString() ?? new Date().toISOString(),
     }))
   );
@@ -84,6 +86,7 @@ router.put("/:plantId", async (req, res) => {
       growthLevel: plantsTable.growthLevel,
       growthPoints: plantsTable.growthPoints,
       maxGrowthPoints: plantsTable.maxGrowthPoints,
+      witheredAt: plantsTable.witheredAt,
       createdAt: plantsTable.createdAt,
     })
     .from(plantsTable)
@@ -101,6 +104,7 @@ router.put("/:plantId", async (req, res) => {
     growthPoints: p.growthPoints,
     maxGrowthPoints: p.maxGrowthPoints,
     accentColor: p.accentColor ?? "#4CAF50",
+    withered: p.witheredAt !== null,
     createdAt: p.createdAt?.toISOString() ?? new Date().toISOString(),
   });
 });
