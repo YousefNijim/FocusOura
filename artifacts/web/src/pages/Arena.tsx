@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MobileLayout } from "@/components/MobileLayout";
-import { fetchApi } from "@/utils/api";
+import { fetchApi, describeApiError } from "@/utils/api";
 import { useToast } from "@/hooks/use-toast";
 import {
   Swords, Users, Search, UserPlus, Check, X, Link2, Trophy,
@@ -319,7 +319,7 @@ function CreateChallengeSheet({ onClose, onCreated }: { onClose: () => void; onC
       toast({ title: "Challenge created!", description: "Share it with friends to get them to join." });
       onCreated();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message ?? "Could not create challenge", variant: "destructive" }),
+    onError: (e: unknown) => toast({ ...describeApiError(e, "Could not create challenge"), variant: "destructive" }),
   });
 
   return (
@@ -539,7 +539,7 @@ function ChallengesTab() {
       setSelectedChallenge(data);
       toast({ title: "Joined!", description: "You're in the challenge. Good luck!" });
     },
-    onError: (e: any) => toast({ title: "Couldn't join", description: e.message ?? "Error", variant: "destructive" }),
+    onError: (e: unknown) => toast({ ...describeApiError(e, "Could not join this challenge"), variant: "destructive" }),
   });
 
   const filtered = challenges.filter((c) => filter === "all" ? true : c.status === filter);

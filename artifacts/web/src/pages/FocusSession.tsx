@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useSession } from "@/context/SessionContext";
-import { fetchApi, pauseSession as apiPauseSession, resumeSession as apiResumeSession } from "@/utils/api";
+import { fetchApi, describeApiError, pauseSession as apiPauseSession, resumeSession as apiResumeSession } from "@/utils/api";
 import { useToast } from "@/hooks/use-toast";
 import { PLANT_CATALOG } from "@/constants/plants";
 import { useAmbientSound } from "@/hooks/useAmbientSound";
@@ -373,8 +373,8 @@ export default function FocusSession() {
         countdownMins,
         mode: timerMode,
       });
-    } catch {
-      toast({ title: "Error", description: "Could not start session", variant: "destructive" });
+    } catch (err) {
+      toast({ ...describeApiError(err, "Could not start session"), variant: "destructive" });
     } finally {
       setLoading(false);
     }
