@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { fetchApi } from "@/utils/api";
 import { Button } from "@/components/ui/button";
 import { PLANT_CATALOG } from "@/constants/plants";
+import PlantArt from "@/components/garden/PlantArt";
 
 // ── Lightweight confetti burst (no external dep) ───────────────────────────
 const CONFETTI_COLORS = [
@@ -202,10 +203,8 @@ export default function StepThree({ subjectName, subjectId, plantType, onComplet
             </p>
             <div className="flex items-center gap-2 mt-0.5">
               {/* Growing animation: scales from 0.4 to 1 slowly */}
-              <motion.img
-                src={plant.image}
-                alt={plant.name}
-                className="w-8 h-8 object-contain"
+              <motion.div
+                className="w-8 h-8"
                 initial={{ scale: 0.4, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{
@@ -213,7 +212,9 @@ export default function StepThree({ subjectName, subjectId, plantType, onComplet
                   duration: 0.7,
                   ease: [0.16, 1, 0.3, 1], // easeOutExpo — feels like growing
                 }}
-              />
+              >
+                <PlantArt type={plant.id} stage={4} className="w-full h-full" />
+              </motion.div>
               <p className="text-sm font-semibold text-foreground">{plant.name}</p>
             </div>
           </div>

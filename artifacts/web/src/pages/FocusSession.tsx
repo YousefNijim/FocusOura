@@ -16,6 +16,7 @@ import { useAmbientSound } from "@/hooks/useAmbientSound";
 import { AmbientSoundPicker } from "@/components/AmbientSoundPicker";
 import { useInventory } from "@/hooks/useInventory";
 import { useMotivationMessage } from "@/hooks/useMotivationMessage";
+import PlantArt, { stageForGrowth } from "@/components/garden/PlantArt";
 
 const SESSION_TYPES = [
   { id: "routine",    label: "Routine",    icon: BookOpen, multiplier: 1 },
@@ -159,7 +160,7 @@ function PlantCarousel({ index, onChange, disabled }: { index: number; onChange:
           <ChevronLeft size={16} />
         </button>
         <div className="flex flex-col items-center gap-0.5 w-28">
-          <img src={plant.image} alt={plant.name} className="w-14 h-14 object-contain drop-shadow-md transition-all duration-300" />
+          <PlantArt type={plant.id} stage={4} className="w-14 h-14 drop-shadow-md transition-all duration-300" />
           <p className="text-sm font-semibold text-foreground">{plant.name}</p>
           <p className="text-[11px] text-muted-foreground">{plant.desc}</p>
         </div>
@@ -205,7 +206,7 @@ function WalletModal({ open, onClose, plants }: { open: boolean; onClose: () => 
             const pct = Math.floor((plant.growthPoints / plant.maxGrowthPoints) * 100);
             return (
               <div key={plant.id} className="glass rounded-xl p-3 flex items-center gap-3">
-                <img src={cat.image} alt={cat.name} className="w-12 h-12 object-contain flex-shrink-0" />
+                <PlantArt type={cat.id} stage={stageForGrowth(plant.growthLevel)} className="w-12 h-12 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
                     <p className="text-sm font-semibold text-foreground">{cat.name}</p>
@@ -508,7 +509,7 @@ export default function FocusSession() {
   };
 
   const selectedSubject   = subjects.find((s) => s.id === selectedSubjectId);
-  const activePlantImg    = PLANT_CATALOG[plantIndex].image;
+  const activePlantType   = PLANT_CATALOG[plantIndex].id;
   const previewPlants     = Math.floor(countdownMins / PLANT_INTERVAL_MINS);
   const actualElapsedMins = Math.floor(elapsedSecs / 60);
   const countdownProgress = session?.mode === "countdown" && session.countdownMins > 0
@@ -596,7 +597,7 @@ export default function FocusSession() {
           {/* Countdown idle — circular picker */}
           {timerMode === "countdown" && isIdle && (
             <CircularPicker minutes={countdownMins} onChange={setCountdownMins} disabled={false}>
-              <img src={activePlantImg} alt="plant" className="w-14 h-14 object-contain mb-0.5" />
+              <PlantArt type={activePlantType} stage={4} className="w-14 h-14 mb-0.5" />
               <span className="text-3xl font-bold text-foreground font-mono leading-none">
                 {String(countdownMins).padStart(2, "0")}m
               </span>
@@ -609,7 +610,7 @@ export default function FocusSession() {
           {/* Stopwatch idle */}
           {timerMode === "stopwatch" && isIdle && (
             <ProgressRing progress={0}>
-              <img src={activePlantImg} alt="plant" className="w-14 h-14 object-contain mb-0.5" />
+              <PlantArt type={activePlantType} stage={4} className="w-14 h-14 mb-0.5" />
               <span className="text-3xl font-bold text-foreground font-mono leading-none">00:00</span>
               <span className="text-[11px] text-muted-foreground mt-0.5">Ready</span>
             </ProgressRing>
@@ -619,7 +620,7 @@ export default function FocusSession() {
           {session?.mode === "countdown" && isActive && (
             <div className={`transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}>
               <ProgressRing progress={countdownProgress}>
-                <img src={activePlantImg} alt="plant" className={`w-14 h-14 object-contain mb-0.5 ${isRunning ? "animate-float" : ""}`} />
+                <PlantArt type={activePlantType} stage={4} className={`w-14 h-14 mb-0.5 ${isRunning ? "animate-float" : ""}`} />
                 <span className="text-3xl font-bold text-foreground font-mono leading-none">{formatTime(timeLeft)}</span>
                 {isPaused ? (
                   <span className="flex items-center gap-1 text-[11px] text-amber-500 mt-0.5 font-medium">
@@ -637,7 +638,7 @@ export default function FocusSession() {
           {session?.mode === "stopwatch" && isActive && (
             <div className={`transition-opacity duration-300 ${isPaused ? "opacity-60" : "opacity-100"}`}>
               <ProgressRing progress={stopwatchProgress}>
-                <img src={activePlantImg} alt="plant" className={`w-14 h-14 object-contain mb-0.5 ${isRunning ? "animate-float" : ""}`} />
+                <PlantArt type={activePlantType} stage={4} className={`w-14 h-14 mb-0.5 ${isRunning ? "animate-float" : ""}`} />
                 <span className="text-3xl font-bold text-foreground font-mono leading-none">{formatTime(elapsedSecs)}</span>
                 {isPaused ? (
                   <span className="flex items-center gap-1 text-[11px] text-amber-500 mt-0.5 font-medium">
@@ -654,7 +655,7 @@ export default function FocusSession() {
           {/* Done */}
           {isDone && (
             <ProgressRing progress={1}>
-              <img src={activePlantImg} alt="plant" className="w-14 h-14 object-contain mb-0.5" />
+              <PlantArt type={activePlantType} stage={4} className="w-14 h-14 mb-0.5" />
               <span className="text-xl font-bold text-primary font-mono">Done!</span>
               <span className="text-[11px] text-muted-foreground mt-0.5">
                 {completionActualMins > 0 ? `${completionActualMins}m studied` : `${actualElapsedMins}m studied`}

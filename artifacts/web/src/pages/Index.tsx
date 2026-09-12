@@ -2,9 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { MobileLayout } from "@/components/MobileLayout";
 import { Onboarding } from "@/components/Onboarding";
 import { Coins, Flame, Sprout, ChevronRight, Leaf, Lock } from "lucide-react";
-import plant1 from "@/assets/plant-1.png";
-import plant2 from "@/assets/plant-2.png";
-import plant3 from "@/assets/plant-3.png";
+import PlantArt, { stageForGrowth, toPlantType } from "@/components/garden/PlantArt";
 import petHappy from "@/assets/pet-happy.png";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
@@ -14,7 +12,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useInventory } from "@/hooks/useInventory";
 import { CalendarSection } from "@/components/CalendarSection";
 
-const plantImages = [plant1, plant2, plant3];
 const PET_UNLOCK_THRESHOLD = 5;
 const PET_CELEBRATED_KEY = (userId: string) => `focusoura_pet_unlocked_${userId}`;
 
@@ -186,16 +183,10 @@ const Dashboard = () => {
               className="glass rounded-2xl p-4 flex flex-col items-center cursor-pointer hover:bg-card/80 transition-all"
               onClick={() => navigate("/garden")}
             >
-              <img
-                src={
-                  plantImages[Math.min(firstPlant.growthLevel - 1, plantImages.length - 1)] ||
-                  plant1
-                }
-                alt="Plant"
-                width={72}
-                height={72}
-                className="animate-float"
-                style={{ animationDelay: "0.5s" }}
+              <PlantArt
+                type={toPlantType((firstPlant as any).plantType)}
+                stage={stageForGrowth(firstPlant.growthLevel)}
+                className="w-[72px] h-[72px] animate-float"
               />
               <p className="text-sm font-medium text-foreground mt-3">{firstSubject.name}</p>
               <p className="text-xs text-muted-foreground">Lvl {firstPlant.growthLevel}</p>
