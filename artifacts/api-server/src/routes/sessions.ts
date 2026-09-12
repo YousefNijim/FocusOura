@@ -13,7 +13,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, isNull, inArray, sql, gte } from "drizzle-orm";
 import { getUserId, ensureUser } from "./users.js";
-import { PLANT_GROWTH } from "../lib/constants.js";
+import { PLANT_GROWTH, PLANT_TYPES, isPlantType } from "../lib/constants.js";
 import { logger } from "../lib/logger.js";
 import { sendPushNotification } from "../lib/push.js";
 import { requireVerified } from "../middleware/requireVerified.js";
@@ -192,6 +192,11 @@ router.post("/", requireVerified, async (req, res) => {
 
   if (!plantType || !sessionType || !durationMinutes) {
     res.status(400).json({ error: "plantType, sessionType, durationMinutes required" });
+    return;
+  }
+
+  if (!isPlantType(plantType)) {
+    res.status(400).json({ error: `plantType must be one of: ${PLANT_TYPES.join(", ")}` });
     return;
   }
 
