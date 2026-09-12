@@ -12,6 +12,7 @@ import { sendVerificationEmail, sendPasswordResetEmail } from "../lib/email.js";
 import { recordPasswordReset } from "../lib/sessionInvalidation.js";
 import { authMiddleware } from "../middleware/auth.js";
 import type { AuthRequest } from "../middleware/auth.js";
+import { serverGoogleApiKey } from "../lib/googleKeys.js";
 
 // ─── In-memory rate limiter: max 3 forgot-password requests per email per hour ─
 const forgotRateLimit = new Map<string, { count: number; windowEnd: number }>();
@@ -193,7 +194,7 @@ router.post("/google", async (req, res) => {
     if (!credential) {
       return res.status(400).json({ error: "Google credential is required" });
     }
-    const firebaseApiKey = process.env.GOOGLE_API_KEY;
+    const firebaseApiKey = serverGoogleApiKey();
     if (!firebaseApiKey) {
       return res.status(503).json({ error: "Google authentication is not configured" });
     }
