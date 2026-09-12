@@ -1,9 +1,11 @@
 import { Router, type IRouter } from "express";
+import { browserFirebaseApiKey } from "../lib/googleKeys.js";
 
 const router: IRouter = Router();
 
 router.get("/firebase", (_req, res) => {
-  const apiKey = process.env.GOOGLE_API_KEY;
+  // Browser key by design — never the server key.
+  const apiKey = browserFirebaseApiKey();
   if (!apiKey) {
     return res.status(503).json({ error: "Firebase not configured" });
   }
