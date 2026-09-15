@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { MobileLayout } from "@/components/MobileLayout";
 import PetArt from "@/components/pet/PetArt";
 import { usePetState } from "@/components/pet/usePetState";
@@ -40,8 +40,21 @@ const colorOptions = [
 // Two, not three: the app shell is max-w-md, and a pot does not grow with its
 // plant — at three across, a level-1 seedling rendered about six pixels tall
 // inside a full-size pot and the slot read as empty.
-const POTS_PER_SHELF = 2;
+const POTS_PER_SHELF = 3;
 
+/**
+ * The garden, as shelves you slide sideways rather than stack downwards.
+ *
+ * Stacked vertically, the garden grew without limit: every few plants added
+ * another plank, and the stats, the pet and the chart below were pushed further
+ * off the screen. Shelving sideways fixes the height at exactly one shelf no
+ * matter how many plants there are.
+ *
+ * The cost is honest and worth naming: you can no longer see the whole garden
+ * at once. The dots below carry the count so the rest of it is at least
+ * announced, and they are buttons, because a swipe must never be the only way
+ * to reach something.
+ */
 function PottingShelf({
   plants,
   subjects,
@@ -61,11 +74,39 @@ function PottingShelf({
     shelves.push(slots.slice(i, i + POTS_PER_SHELF));
   }
 
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [current, setCurrent] = useState(0);
+
+  // Read the position back off the scroll container rather than tracking it
+  // separately, so a swipe, a dot and a keyboard arrow all agree.
+  const handleScroll = () => {
+    const el = trackRef.current;
+    if (!el) return;
+    setCurrent(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
+  };
+
+  const goTo = (index: number) => {
+    const el = trackRef.current;
+    if (!el) return;
+    const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollTo({ left: index * el.clientWidth, behavior: smooth ? "smooth" : "auto" });
+  };
+
   return (
-    <div className="flex flex-col gap-5">
+    <div>
+      <div
+        ref={trackRef}
+        onScroll={handleScroll}
+        tabIndex={0}
+        role="group"
+        aria-label={`Garden shelves, ${shelves.length} in total`}
+        className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth rounded-lg
+                   focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary
+                   [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
       {shelves.map((shelf, shelfIndex) => (
-        <div key={shelfIndex}>
-          <div className="grid grid-cols-2 gap-3 items-end px-1.5">
+        <div key={shelfIndex} className="w-full shrink-0 snap-center px-0.5">
+          <div className="grid grid-cols-3 gap-2 items-end px-1.5">
             {shelf.map((plant, i) =>
               plant ? (
                 <button
@@ -107,7 +148,7 @@ function PottingShelf({
             }}
           />
 
-          <div className="grid grid-cols-2 gap-3 px-1.5 mt-2.5">
+          <div className="grid grid-cols-3 gap-2 px-1.5 mt-2.5">
             {shelf.map((plant, i) => {
               if (!plant) {
                 return (
@@ -131,14 +172,16 @@ function PottingShelf({
                       {plant.withered
                         ? "withered"
                         : grown
-                          ? plant.blooms
-                            ? `fully grown · ${plant.blooms} bloom${plant.blooms > 1 ? "s" : ""}`
-                            : "fully grown"
+                          ? "fully grown"
                           : `Lv ${plant.growthLevel} · ${pct}%`}
                     </p>
                     {grown ? (
-                      <div className="mt-1 text-[10px]" style={{ color: subject?.accentColor ?? "var(--accent)" }}>
-                        ✿
+                      <div
+                        className="mt-1 text-[10px] leading-none"
+                        style={{ color: subject?.accentColor ?? "hsl(var(--accent))" }}
+                        title={plant.blooms ? `${plant.blooms} bloom${plant.blooms > 1 ? "s" : ""}` : undefined}
+                      >
+                        ✿{plant.blooms ? ` ${plant.blooms}` : ""}
                       </div>
                     ) : (
                       <div className="w-[70%] mx-auto h-[3px] rounded-sm bg-border overflow-hidden mt-1">
@@ -146,7 +189,7 @@ function PottingShelf({
                           className="h-full rounded-sm"
                           style={{
                             width: `${pct}%`,
-                            background: plant.withered ? "var(--dead-mid)" : subject?.accentColor ?? "var(--accent)",
+                            background: plant.withered ? "var(--dead-mid)" : subject?.accentColor ?? "hsl(var(--accent))",
                           }}
                         />
                       </div>
@@ -157,6 +200,28 @@ function PottingShelf({
           </div>
         </div>
       ))}
+      </div>
+
+      {shelves.length > 1 && (
+        <div className="flex items-center justify-center gap-3 mt-4">
+          <div className="flex items-center gap-1.5">
+            {shelves.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => goTo(i)}
+                aria-label={`Shelf ${i + 1} of ${shelves.length}`}
+                aria-current={i === current}
+                className={`h-2 rounded-full transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                  i === current ? "w-5 bg-primary" : "w-2 bg-border hover:bg-muted-foreground/40"
+                }`}
+              />
+            ))}
+          </div>
+          <span className="text-[10px] font-mono tabular-nums text-muted-foreground" aria-hidden="true">
+            {current + 1}/{shelves.length}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
