@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { MobileLayout } from "@/components/MobileLayout";
+import PetArt from "@/components/pet/PetArt";
+import { usePetState } from "@/components/pet/usePetState";
 import { Plus, ChevronLeft, ChevronRight, Leaf, Lock, Pencil, Trash2, Check, X } from "lucide-react";
-import petHappy from "@/assets/pet-happy.png";
 import {
   BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
@@ -218,6 +219,7 @@ export default function Garden() {
   const petUnlocked     = stats?.petUnlocked ?? false;
   const petMoodKey      = stats?.petMood ?? "neutral";
   const petMood         = getPetMoodFromKey(petMoodKey);
+  const gardenPetState  = usePetState({ moodKey: petMoodKey }).state;
   const selectedPetId   = user?.selectedPetId ?? "mochi";
   const activePet       = getPetById(selectedPetId);
   const plantsToUnlock  = Math.max(0, PET_UNLOCK_THRESHOLD - fullyGrownCount);
@@ -426,12 +428,13 @@ export default function Garden() {
           <div className="glass rounded-2xl p-4 border border-border">
             <div className="flex items-center gap-4">
               <div className="relative flex-shrink-0">
-                {selectedPetId === "mochi" ? (
-                  <img src={petHappy} alt="Study Pet" width={56} height={56} className="animate-float" />
-                ) : (
-                  <div className="w-14 h-14 flex items-center justify-center text-4xl animate-float">{activePet.emoji}</div>
-                )}
-                <span className="absolute -bottom-1 -right-1 text-base">{petMood.emoji}</span>
+                <PetArt
+                  petId={selectedPetId}
+                  state={gardenPetState}
+                  accentColor={activePet.accentColor}
+                  className="w-14 h-14"
+                  label={`${activePet.name} is ${petMood.label.toLowerCase()}`}
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-foreground text-sm">{activePet.name}</p>

@@ -4,6 +4,7 @@ import { PET_CATALOG, getPetById, getUnlockLabel, type PetDefinition } from "@/c
 import { fetchApi } from "@/utils/api";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
+import PetArt from "@/components/pet/PetArt";
 
 type Props = {
   open: boolean;
@@ -84,8 +85,14 @@ export function PetSelectModal({
                   isSelected ? "border-primary" : "border-transparent"
                 }`}
               >
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl bg-gradient-to-br ${pet.bgGradient} flex-shrink-0 ${!isUnlocked ? "opacity-40 grayscale" : ""}`}>
-                  {pet.emoji}
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center bg-gradient-to-br ${pet.bgGradient} flex-shrink-0 ${!isUnlocked ? "opacity-40 grayscale" : ""}`}>
+                  <PetArt
+                    petId={pet.id}
+                    state={isSelected ? "happy" : "neutral"}
+                    accentColor={pet.accentColor}
+                    className="w-[52px] h-[52px]"
+                    label={pet.name}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">

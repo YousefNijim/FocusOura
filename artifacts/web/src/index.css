@@ -282,3 +282,44 @@ nav.fixed.bottom-0 {
   --shelf-edge:  #332519;
   --shelf-shadow:#0C0A07;
 }
+
+/* ── Study pets ────────────────────────────────────────────────────────────
+   Five species, five palettes. Each pet carries its own class, so the drawing
+   is one file while the colour is data — and every palette has a night pair
+   for the same reason the plants do: a coat tuned for the cream background
+   turns into a lamp on the dark one.
+
+   --p-fur      main coat        --p-fur-dk  shading, stripes, undersides
+   --p-fur-lt   belly, muzzle    --p-inner   inner ear / throat
+   --p-nose     nose and pads    --p-eye / --p-glint
+   --p-shadow   ground contact */
+:root {
+  --p-eye:    #2B2622;
+  --p-glint:  #FFFFFF;
+  --p-shadow: #2A3A31;
+}
+.dark {
+  --p-eye:    #17130F;
+  --p-glint:  #E8DFD2;
+  --p-shadow: #000000;
+}
+
+/* Mochi — ginger tabby cat */
+.pet-mochi  { --p-fur:#DBA269; --p-fur-dk:#B87C42; --p-fur-lt:#F4E0C6; --p-inner:#EC9E95; --p-nose:#C97A70; }
+.dark .pet-mochi { --p-fur:#A97A4A; --p-fur-dk:#8A5C2F; --p-fur-lt:#C6AB88; --p-inner:#A96E68; --p-nose:#8E564F; }
+
+/* Sprout — tree frog */
+.pet-sprout { --p-fur:#6FBF63; --p-fur-dk:#478C3F; --p-fur-lt:#D3EBAF; --p-inner:#A8D98E; --p-nose:#37702F; }
+.dark .pet-sprout { --p-fur:#4C8843; --p-fur-dk:#33612B; --p-fur-lt:#87A96C; --p-inner:#6C9455; --p-nose:#25501F; }
+
+/* Luna — lilac rabbit */
+.pet-luna   { --p-fur:#C6BBD7; --p-fur-dk:#A093B8; --p-fur-lt:#F3EEF8; --p-inner:#E7A9C6; --p-nose:#B3789A; }
+.dark .pet-luna { --p-fur:#887CA0; --p-fur-dk:#665C7E; --p-fur-lt:#B0A5C2; --p-inner:#A0718B; --p-nose:#7F5569; }
+
+/* Ember — red fox */
+.pet-ember  { --p-fur:#E2894A; --p-fur-dk:#B45F2C; --p-fur-lt:#F8E8D6; --p-inner:#3B2D26; --p-nose:#33261F; }
+.dark .pet-ember { --p-fur:#AE6631; --p-fur-dk:#87491F; --p-fur-lt:#C9B29A; --p-inner:#241B15; --p-nose:#1E1610; }
+
+/* Cosmo — brown bear */
+.pet-cosmo  { --p-fur:#A97D57; --p-fur-dk:#835D3C; --p-fur-lt:#E0C8A9; --p-inner:#CB9E79; --p-nose:#46311F; }
+.dark .pet-cosmo { --p-fur:#8A6543; --p-fur-dk:#5C412A; --p-fur-lt:#A98C6C; --p-inner:#8A6647; --p-nose:#2C1F14; }

@@ -3,11 +3,13 @@ import { MobileLayout } from "@/components/MobileLayout";
 import { Onboarding } from "@/components/Onboarding";
 import { Coins, Flame, Sprout, ChevronRight, Leaf, Lock } from "lucide-react";
 import PlantArt, { stageForGrowth, toPlantType } from "@/components/garden/PlantArt";
-import petHappy from "@/assets/pet-happy.png";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { getPetById, getPetMoodFromKey } from "@/constants/pets";
 import { PetSelectModal } from "@/components/PetSelectModal";
+import PetArt from "@/components/pet/PetArt";
+import { usePetState } from "@/components/pet/usePetState";
+import { useSession } from "@/context/SessionContext";
 import { useToast } from "@/hooks/use-toast";
 import { useInventory } from "@/hooks/useInventory";
 import { CalendarSection } from "@/components/CalendarSection";
@@ -44,6 +46,14 @@ const Dashboard = () => {
   const unlockedPetIds = user?.unlockedPetIds ?? ["mochi"];
   const activePet      = getPetById(selectedPetId);
   const petMood        = getPetMoodFromKey(petMoodKey);
+
+  // The dashboard can be open while a session runs in another tab or behind a
+  // lock screen, so the pet reads the live session rather than assuming idle.
+  const { session } = useSession();
+  const { state: petState, react: petReact } = usePetState({
+    moodKey: petMoodKey,
+    sessionState: session?.state ?? null,
+  });
 
   const plantsToUnlock = Math.max(0, PET_UNLOCK_THRESHOLD - fullyGrownCount);
   const userId = user?.id ?? "";
@@ -128,17 +138,17 @@ const Dashboard = () => {
           {petUnlocked ? (
             <button
               onClick={() => setShowPetModal(true)}
+              onPointerDown={() => petReact("celebrating")}
               className="glass rounded-2xl p-4 flex flex-col items-center hover:bg-card/80 transition-all active:scale-98"
             >
               <div className="relative">
-                {selectedPetId === "mochi" ? (
-                  <img src={petHappy} alt="Study Pet" width={72} height={72} className="animate-float" />
-                ) : (
-                  <div className="w-[72px] h-[72px] flex items-center justify-center text-5xl animate-float">
-                    {activePet.emoji}
-                  </div>
-                )}
-                <span className="absolute -bottom-1 -right-1 text-lg">{petMood.emoji}</span>
+                <PetArt
+                  petId={selectedPetId}
+                  state={petState}
+                  accentColor={activePet.accentColor}
+                  className="w-[72px] h-[72px]"
+                  label={`${activePet.name} is ${petMood.label.toLowerCase()}`}
+                />
                 {petOutfit && (
                   <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-lg leading-none">{petOutfit.icon}</span>
                 )}
