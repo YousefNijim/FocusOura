@@ -8,6 +8,7 @@ import {
 } from "@workspace/db";
 import { eq, and, gte, sql, isNull } from "drizzle-orm";
 import { getUserStreak } from "../lib/queries.js";
+import { PLANT_GROWTH } from "../lib/constants.js";
 
 const router: IRouter = Router();
 
@@ -219,8 +220,11 @@ router.get(["/", "/stats"], async (req, res) => {
   const allPlants = await db.select({ growthLevel: plantsTable.growthLevel }).from(plantsTable).where(eq(plantsTable.userId, userId));
   const { currentStreak, longestStreak } = await getUserStreak(userId);
 
-  // Pet unlock: need 5+ fully-grown plants (growthLevel >= 3 = max level)
-  const FULLY_GROWN_LEVEL = 3;
+  // Pet unlock: 5+ fully-grown plants. This was 3 while the art had four
+  // stages, so the plant that unlocked the pet was drawn in its
+  // second-to-last form — the reward and the picture disagreed about what
+  // finished looks like.
+  const FULLY_GROWN_LEVEL = PLANT_GROWTH.MAX_LEVEL;
   const fullyGrownCount = allPlants.filter((p) => (p.growthLevel ?? 1) >= FULLY_GROWN_LEVEL).length;
   const petUnlocked = fullyGrownCount >= 5;
 

@@ -15,7 +15,7 @@ import { fetchApi, describeApiError } from "@/utils/api";
 import { useToast } from "@/hooks/use-toast";
 import { getPetById, getPetMoodFromKey } from "@/constants/pets";
 
-import PlantArt, { stageForGrowth, toPlantType } from "@/components/garden/PlantArt";
+import PlantArt, { stageForGrowth, toPlantType, MAX_PLANT_LEVEL } from "@/components/garden/PlantArt";
 
 type ViewMode = "day" | "week" | "month" | "year";
 type Session = {
@@ -118,22 +118,37 @@ function PottingShelf({
                 100,
                 Math.round((plant.growthPoints / Math.max(1, plant.maxGrowthPoints)) * 100),
               );
+              // A plant at the final level is finished: it drops the progress bar
+              // and counts blooms instead of pretending to still be growing.
+              const grown = !plant.withered && plant.growthLevel >= MAX_PLANT_LEVEL;
               return (
-                <div key={`meta-${plant.id}`} className="text-center min-w-0">
-                  <p className="text-[11px] font-medium truncate">{subject?.name ?? "General"}</p>
-                  <p className="text-[9.5px] font-mono text-muted-foreground tabular-nums">
-                    {plant.withered ? "withered" : `Lv ${plant.growthLevel} · ${pct}%`}
-                  </p>
-                  <div className="w-[70%] mx-auto h-[3px] rounded-sm bg-border overflow-hidden mt-1">
-                    <div
-                      className="h-full rounded-sm"
-                      style={{
-                        width: `${pct}%`,
-                        background: plant.withered ? "var(--dead-mid)" : subject?.accentColor ?? "var(--accent)",
-                      }}
-                    />
+                  <div key={`meta-${plant.id}`} className="text-center min-w-0">
+                    <p className="text-[11px] font-medium truncate">{subject?.name ?? "General"}</p>
+                    <p className="text-[9.5px] font-mono text-muted-foreground tabular-nums">
+                      {plant.withered
+                        ? "withered"
+                        : grown
+                          ? plant.blooms
+                            ? `fully grown · ${plant.blooms} bloom${plant.blooms > 1 ? "s" : ""}`
+                            : "fully grown"
+                          : `Lv ${plant.growthLevel} · ${pct}%`}
+                    </p>
+                    {grown ? (
+                      <div className="mt-1 text-[10px]" style={{ color: subject?.accentColor ?? "var(--accent)" }}>
+                        ✿
+                      </div>
+                    ) : (
+                      <div className="w-[70%] mx-auto h-[3px] rounded-sm bg-border overflow-hidden mt-1">
+                        <div
+                          className="h-full rounded-sm"
+                          style={{
+                            width: `${pct}%`,
+                            background: plant.withered ? "var(--dead-mid)" : subject?.accentColor ?? "var(--accent)",
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
-                </div>
               );
             })}
           </div>
