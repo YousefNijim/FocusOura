@@ -10,7 +10,6 @@ const PLANT_INTERVAL_MINS   = 25;
 export interface StoredSession {
   sessionId:            string;
   mode:                 "countdown" | "stopwatch";
-  plantIndex:           number;
   plantType:            string;
   sessionTypeId:        string;
   sessionTypeMultiplier: number;
@@ -25,7 +24,6 @@ export interface StoredSession {
 }
 
 export interface StartSessionParams {
-  plantIndex:           number;
   plantType:            string;
   sessionTypeId:        string;
   sessionTypeMultiplier: number;
@@ -154,7 +152,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const s: StoredSession = {
       sessionId:             res.id,
       mode:                  p.mode,
-      plantIndex:            p.plantIndex,
       plantType:             p.plantType,
       sessionTypeId:         p.sessionTypeId,
       sessionTypeMultiplier: p.sessionTypeMultiplier,

@@ -2,9 +2,8 @@ import { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { BottomNav } from "./BottomNav";
 import { useSession } from "@/context/SessionContext";
-import { PLANT_CATALOG } from "@/constants/plants";
 import { Timer, Zap } from "lucide-react";
-import PlantArt from "@/components/garden/PlantArt";
+import PlantArt, { toPlantType } from "@/components/garden/PlantArt";
 import GardenDefs from "@/components/garden/GardenDefs";
 
 interface MobileLayoutProps {
@@ -26,7 +25,7 @@ function ActiveSessionBar() {
 
   if (!session || location.pathname === "/focus") return null;
 
-  const plant    = PLANT_CATALOG[session.plantIndex] ?? PLANT_CATALOG[0];
+  const plantType = toPlantType(session.plantType);
   const display  = session.mode === "countdown" ? formatTime(Math.max(0, timeLeft)) : formatTime(elapsedSecs);
   const isPaused = session.state === "paused";
 
@@ -37,7 +36,7 @@ function ActiveSessionBar() {
     >
       <div className="glass-strong rounded-2xl px-4 py-2.5 flex items-center gap-3 border border-primary/20 shadow-lg shadow-primary/10">
         <div className="relative flex-shrink-0">
-          <PlantArt type={plant.id} stage={4} className="w-9 h-9" />
+          <PlantArt type={plantType} stage={4} className="w-9 h-9" />
           {!isPaused && (
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border border-background animate-pulse" />
           )}
@@ -46,7 +45,7 @@ function ActiveSessionBar() {
           <p className="text-xs text-muted-foreground leading-none mb-0.5">
             {isPaused ? "Session Paused" : "Session Running"}
           </p>
-          <p className="text-sm font-semibold text-foreground leading-none">{plant.name}</p>
+          <p className="text-sm font-semibold text-foreground leading-none truncate">{session.subjectName || "Unsorted"}</p>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {session.mode === "countdown" ? (

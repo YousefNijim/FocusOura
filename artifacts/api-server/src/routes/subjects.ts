@@ -85,15 +85,33 @@ router.put("/:subjectId", async (req, res) => {
   const userId = getUserId(req);
   const { subjectId } = req.params;
 
-  const { name, accentColor } = req.body;
+  const { name, accentColor, plantType } = req.body;
   const updates: Record<string, unknown> = {};
   if (name) updates.name = name;
   if (accentColor) updates.accentColor = accentColor;
 
-  await db
-    .update(subjectsTable)
-    .set(updates)
-    .where(and(eq(subjectsTable.id, subjectId), eq(subjectsTable.userId, userId)));
+  if (plantType !== undefined && !isPlantType(plantType)) {
+    res.status(400).json({ error: `plantType must be one of: ${PLANT_TYPES.join(", ")}` });
+    return;
+  }
+
+  if (Object.keys(updates).length) {
+    await db
+      .update(subjectsTable)
+      .set(updates)
+      .where(and(eq(subjectsTable.id, subjectId), eq(subjectsTable.userId, userId)));
+  }
+
+  // The species belongs to the subject, so changing it here re-skins the
+  // subject's plant. Only the drawing changes — level, points and blooms are
+  // the user's history and survive the swap, which is what makes changing your
+  // mind cheap enough to offer at all.
+  if (plantType) {
+    await db
+      .update(plantsTable)
+      .set({ plantType })
+      .where(and(eq(plantsTable.subjectId, subjectId), eq(plantsTable.userId, userId)));
+  }
 
   const updated = await db.select().from(subjectsTable).where(eq(subjectsTable.id, subjectId)).limit(1);
   const s = updated[0];

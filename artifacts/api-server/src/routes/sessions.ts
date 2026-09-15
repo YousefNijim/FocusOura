@@ -36,7 +36,7 @@ function calcGrowthPoints(actualMinutes: number): number {
 
 async function findOrCreatePlant(
   userId: string,
-  plantType: string,
+  plantType: string | undefined,
   subjectId: string | null,
   subjectPlantId: string | null
 ): Promise<string> {
@@ -50,7 +50,7 @@ async function findOrCreatePlant(
       id: plantId,
       userId,
       subjectId,
-      plantType,
+      plantType: plantType ?? "fern",
       growthLevel: 1,
       growthPoints: 0,
       maxGrowthPoints: 100,
@@ -76,7 +76,7 @@ async function findOrCreatePlant(
     id: plantId,
     userId,
     subjectId: null,
-    plantType,
+    plantType: plantType ?? "fern",
     growthLevel: 1,
     growthPoints: 0,
     maxGrowthPoints: 100,
@@ -188,12 +188,16 @@ router.post("/", requireVerified, async (req, res) => {
 
   const { subjectId, calendarItemId, plantType, sessionType, durationMinutes } = req.body;
 
-  if (!plantType || !sessionType || !durationMinutes) {
-    res.status(400).json({ error: "plantType, sessionType, durationMinutes required" });
+  if (!sessionType || !durationMinutes) {
+    res.status(400).json({ error: "sessionType and durationMinutes are required" });
     return;
   }
 
-  if (!isPlantType(plantType)) {
+  // plantType is optional now that the species belongs to the subject rather
+  // than the session. A subject session uses the subject's own plant; a session
+  // without one uses the single unsorted plant. It is still accepted, and still
+  // validated, because it seeds the unsorted plant the first time.
+  if (plantType !== undefined && !isPlantType(plantType)) {
     res.status(400).json({ error: `plantType must be one of: ${PLANT_TYPES.join(", ")}` });
     return;
   }

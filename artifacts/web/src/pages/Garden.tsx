@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { getPetById, getPetMoodFromKey } from "@/constants/pets";
 
 import PlantArt, { stageForGrowth, toPlantType, MAX_PLANT_LEVEL } from "@/components/garden/PlantArt";
+import type { PlantType } from "@/components/garden/PlantArt";
+import { PLANT_CATALOG } from "@/constants/plants";
 
 type ViewMode = "day" | "week" | "month" | "year";
 type Session = {
@@ -255,6 +257,7 @@ export default function Garden() {
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("");
+  const [editPlantType, setEditPlantType] = useState<PlantType>("fern");
   const [editSaving, setEditSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
@@ -264,6 +267,7 @@ export default function Garden() {
     setEditingSubjectId(subject.id);
     setEditName(subject.name);
     setEditColor(subject.accentColor);
+    setEditPlantType(toPlantType(plant.plantType));
     setDeleteConfirm(null);
   };
 
@@ -273,7 +277,7 @@ export default function Garden() {
     try {
       await fetchApi(`/subjects/${subjectId}`, {
         method: "PUT",
-        body: JSON.stringify({ name: editName.trim(), accentColor: editColor }),
+        body: JSON.stringify({ name: editName.trim(), accentColor: editColor, plantType: editPlantType }),
       });
       setEditingSubjectId(null);
       await refreshData();
@@ -504,6 +508,30 @@ export default function Garden() {
                               style={{ backgroundColor: c, borderColor: editColor === c ? "#fff" : "transparent" }}
                             />
                           ))}
+                        </div>
+
+                        {/* The species belongs to the subject, so it is editable here.
+                            Swapping it re-skins the plant and keeps its level, points
+                            and blooms — the history is the user's, not the drawing's. */}
+                        <div>
+                          <p className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1">Species</p>
+                          <div className="grid grid-cols-4 gap-1">
+                            {PLANT_CATALOG.map((species) => (
+                              <button
+                                key={species.id}
+                                onClick={() => setEditPlantType(species.id)}
+                                aria-label={species.name}
+                                aria-pressed={editPlantType === species.id}
+                                className={`rounded-lg p-0.5 border transition-colors ${
+                                  editPlantType === species.id
+                                    ? "border-primary bg-primary/10"
+                                    : "border-transparent hover:border-border"
+                                }`}
+                              >
+                                <PlantArt type={species.id} stage={4} className="w-full h-auto" />
+                              </button>
+                            ))}
+                          </div>
                         </div>
                         {plant.subjectId != null && deleteConfirm === plant.subjectId ? (
                           <div className="space-y-1.5">
