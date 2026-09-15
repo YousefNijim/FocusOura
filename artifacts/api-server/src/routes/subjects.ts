@@ -13,15 +13,24 @@ router.get("/", async (req, res) => {
   const userId = getUserId(req);
   await ensureUser(userId);
 
+  // Archived subjects stay in the database with their plant and history but
+  // leave the pickers and the garden.
+  const includeArchived = req.query.includeArchived === "1";
+
   const subjects = await db
     .select()
     .from(subjectsTable)
-    .where(eq(subjectsTable.userId, userId));
+    .where(
+      includeArchived
+        ? eq(subjectsTable.userId, userId)
+        : and(eq(subjectsTable.userId, userId), eq(subjectsTable.archived, false)),
+    );
 
   res.json(
     subjects.map((s) => ({
       id: s.id,
       name: s.name,
+      archived: s.archived,
       accentColor: s.accentColor,
       plantId: s.plantId,
       totalFocusMinutes: s.totalFocusMinutes,
@@ -85,10 +94,11 @@ router.put("/:subjectId", async (req, res) => {
   const userId = getUserId(req);
   const { subjectId } = req.params;
 
-  const { name, accentColor, plantType } = req.body;
+  const { name, accentColor, plantType, archived } = req.body;
   const updates: Record<string, unknown> = {};
   if (name) updates.name = name;
   if (accentColor) updates.accentColor = accentColor;
+  if (typeof archived === "boolean") updates.archived = archived;
 
   if (plantType !== undefined && !isPlantType(plantType)) {
     res.status(400).json({ error: `plantType must be one of: ${PLANT_TYPES.join(", ")}` });
@@ -129,6 +139,13 @@ router.put("/:subjectId", async (req, res) => {
 router.delete("/:subjectId", async (req, res) => {
   const userId = getUserId(req);
   const { subjectId } = req.params;
+
+  // The plant goes too. Deleting only the subject row left the plant behind
+  // with a subject_id pointing at nothing, and the garden drew it as a second
+  // "General" plant — while the confirmation had promised to delete it.
+  await db
+    .delete(plantsTable)
+    .where(and(eq(plantsTable.subjectId, subjectId), eq(plantsTable.userId, userId)));
 
   await db
     .delete(subjectsTable)

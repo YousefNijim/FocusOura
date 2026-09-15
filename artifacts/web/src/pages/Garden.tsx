@@ -287,6 +287,24 @@ export default function Garden() {
     } finally { setEditSaving(false); }
   };
 
+  // Archiving is the ordinary way to stop studying something: the plant, its
+  // level and its blooms stay. Deleting is still available and now really does
+  // remove the plant, which the confirmation had always claimed it did.
+  const handleArchiveSubject = async (subjectId: string) => {
+    try {
+      await fetchApi(`/subjects/${subjectId}`, {
+        method: "PUT",
+        body: JSON.stringify({ archived: true }),
+      });
+      setEditingSubjectId(null);
+      setDeleteConfirm(null);
+      await refreshData();
+      toast({ title: "Subject archived", description: "Its plant and history are kept." });
+    } catch (err) {
+      toast({ ...describeApiError(err, "Could not archive subject"), variant: "destructive" });
+    }
+  };
+
   const handleDeleteSubject = async (subjectId: string) => {
     try {
       await fetchApi(`/subjects/${subjectId}`, { method: "DELETE" });
@@ -535,13 +553,21 @@ export default function Garden() {
                         </div>
                         {plant.subjectId != null && deleteConfirm === plant.subjectId ? (
                           <div className="space-y-1.5">
-                            <p className="text-[10px] text-destructive font-medium">Delete this subject and its plant?</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              Archiving keeps this plant and its {plant.growthLevel > 1 || (plant as any).blooms
+                                ? "growth"
+                                : "history"}. Deleting removes both, permanently.
+                            </p>
                             <div className="flex gap-1.5">
                               <button onClick={() => setDeleteConfirm(null)}
                                 className="flex-1 py-1.5 rounded-xl border border-border text-[11px] text-muted-foreground">Cancel</button>
-                              <button onClick={() => plant.subjectId && handleDeleteSubject(plant.subjectId)}
-                                className="flex-1 py-1.5 rounded-xl bg-destructive text-white text-[11px] font-semibold">Delete</button>
+                              <button onClick={() => plant.subjectId && handleArchiveSubject(plant.subjectId)}
+                                className="flex-1 py-1.5 rounded-xl bg-primary text-white text-[11px] font-semibold">Archive</button>
                             </div>
+                            <button onClick={() => plant.subjectId && handleDeleteSubject(plant.subjectId)}
+                              className="w-full py-1 text-[10px] text-destructive underline underline-offset-2">
+                              Delete permanently
+                            </button>
                           </div>
                         ) : (
                           <div className="flex gap-1.5">

@@ -46,6 +46,10 @@ export const subjectsTable = pgTable("subjects", {
   name: text("name").notNull(),
   accentColor: text("accent_color").notNull(),
   plantId: text("plant_id"),
+  // Archived subjects keep their plant and history but leave the pickers and
+  // the garden. Deleting was the only way to stop studying something, and it
+  // left the plant behind with a subjectId pointing at nothing.
+  archived: boolean("archived").notNull().default(false),
   totalFocusMinutes: integer("total_focus_minutes").notNull().default(0),
   sessionCount: integer("session_count").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
