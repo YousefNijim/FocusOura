@@ -1,11 +1,82 @@
-# Handoff — 2026-09-12
+# Handoff — updated 2026-09-15
 
 Written to survive a folder rename and a new session. Nothing here contains a
 secret; credentials are referred to by variable name only.
 
 ---
 
-## Stop here first: why the APK build fails
+## Next session: start here, in this order
+
+The work below is agreed and sequenced. Do it top to bottom — the order is not
+cosmetic; each step depends on the one above it.
+
+### 1. Merge the four stacked PRs, oldest base first
+
+```
+master <- #14 <- #15 <- #16 <- #17
+```
+
+| PR | Branch | What |
+|---|---|---|
+| #14 | `feat/plant-growth-model` | Growth is continuous and capped; withering costs a level |
+| #15 | `feat/species-belongs-to-subject` | The species belongs to the subject, not the session |
+| #16 | `feat/archive-subjects` | Archive subjects instead of deleting them |
+| #17 | `feat/study-pet` | Five drawn pets with a state machine |
+
+Each PR's base is the branch before it, so merging out of order creates
+conflicts that did not otherwise exist. GitHub retargets the next PR as each
+one lands.
+
+### 2. Apply three migrations to Railway Postgres
+
+There is no migration runner. Paste each file into the Postgres **Console** tab
+(not the Data tab, which chokes on `DO $$` blocks). All three are idempotent.
+
+| File | Why it matters |
+|---|---|
+| `006_fix_challenges_end_time.sql` | **First.** The column is `"endTime"`; every Drizzle query asks for `end_time`, so the whole Arena page stays dead until this runs. |
+| `007_plant_blooms.sql` | Adds `blooms`, which #14's merged code already writes to |
+| `008_archive_subjects.sql` | Adds the archive column #16 needs |
+
+004 and 005 are already applied. Verify afterwards:
+
+```sql
+SELECT table_name, column_name FROM information_schema.columns
+WHERE table_name IN ('challenges','plants','subjects')
+  AND column_name IN ('end_time','blooms','archived_at');
+```
+
+### 3. Rebuild and reinstall the APK
+
+The installed build predates the SVG plants, the garden shelves, and the pet
+entirely. See "Resuming the APK build" below — the folder is already renamed,
+so those steps run as written.
+
+### 4. Then look at the pet on a real screen
+
+The pet has been verified as an isolated component only: five species, seven
+states, both themes, at 72/140/180px. It has never been seen inside the
+dashboard, focus, or garden screens, because those need a login.
+
+### Two product decisions still open
+
+- **Pet unlock threshold.** #14 raised it from level 3 to 4. This moves existing
+  users *backwards*: someone whose pet was unlocked may find it locked again.
+  Either accept that, or grandfather anyone who already unlocked it.
+- **Session-type multiplier.** `sessionTypeMultiplier` rides on the session
+  (Deep Focus x3) but does not affect plant growth. Left out deliberately — it
+  is a game-balance call, not a code one.
+
+---
+
+## Resolved: the folder rename
+
+The folder was `FocusOura (1)`; spaces and parentheses break the NDK toolchain,
+which is why a local native build was never possible. **It has been renamed**
+and the APK now builds locally. The original diagnosis is kept for context.
+
+<details>
+<summary>Original symptom</summary>
 
 ```
 Cannot run program ""C:\Users\yosef\Downloads\FocusOura (1)\...\prefab_command.bat""
@@ -32,6 +103,8 @@ git status                  # confirm the main checkout is healthy
 Then start a new session in the renamed folder and continue from
 "Resuming the APK build" below.
 
+</details>
+
 ---
 
 ## Where production stands
@@ -51,6 +124,7 @@ Then start a new session in the renamed folder and continue from
 The database has 20 tables. Migrations `004_plant_type_check.sql` and
 `005_plant_withering.sql` were applied by hand through the Postgres **Console**
 tab; there is no migration runner, so future migrations need the same treatment.
+006, 007 and 008 are **written but not yet applied** — see step 2 above.
 
 ---
 
@@ -81,6 +155,11 @@ Design previews (read-only, for reference):
 ---
 
 ## Resuming the APK build
+
+`artifacts/mobile` was **removed from the pnpm workspace** so Metro resolves its
+own `./index.ts` instead of hunting for one at the repo root. It installs with
+plain `npm`, and its `.npmrc` carries `legacy-peer-deps=true` because
+`lucide-react-native` still declares a peer React of 18 against this repo's 19.
 
 EAS is **out of Android build quota until 2026-10-01** on the free plan. The
 local route is better anyway — `expo prebuild` generates the same native project
@@ -218,3 +297,7 @@ Compare against these before blaming your change:
   `DELETE FROM users WHERE id='demo_claude_diagnostic';`
 - Update the git remote if it still points at the old name:
   `git remote set-url origin https://github.com/YousefNijim/FocusOura.git`
+- **Rotate the database password.** It passed through a chat transcript during
+  the rebuild. Keep it alphanumeric — URI-unsafe characters break `DATABASE_URL`.
+- `.claude/launch.json` was added so browser tooling can boot the web dev server
+  by name (`web`, port 5173). Harmless to keep; delete it if unwanted.
