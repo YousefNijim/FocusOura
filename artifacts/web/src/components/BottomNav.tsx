@@ -34,7 +34,13 @@ export const BottomNav = () => {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md glass-strong rounded-t-2xl z-50">
+      {/* z-40, not z-50. Every modal in the app is `fixed inset-0 z-50`, and they
+          all render inside <main>, which comes BEFORE this nav in the DOM — so at
+          an equal z-index the nav won every tie and painted over all ten bottom
+          sheets, clipping their last row and leaving the nav undimmed behind a
+          dimmed overlay. Nothing else in the app sits between z-20 and z-50, so
+          the nav still floats above all page content. */}
+      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md glass-strong rounded-t-2xl z-40">
         <div className="flex items-center justify-around py-2 px-2">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
