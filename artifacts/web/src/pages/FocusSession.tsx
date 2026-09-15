@@ -17,6 +17,9 @@ import { AmbientSoundPicker } from "@/components/AmbientSoundPicker";
 import { useInventory } from "@/hooks/useInventory";
 import { useMotivationMessage } from "@/hooks/useMotivationMessage";
 import PlantArt, { stageForGrowth, toPlantType } from "@/components/garden/PlantArt";
+import PetArt from "@/components/pet/PetArt";
+import { usePetState } from "@/components/pet/usePetState";
+import { getPetById } from "@/constants/pets";
 
 const SESSION_TYPES = [
   { id: "routine",    label: "Routine",    icon: BookOpen, multiplier: 1 },
@@ -25,6 +28,18 @@ const SESSION_TYPES = [
 ];
 
 type TimerMode = "countdown" | "stopwatch";
+
+// What the pet is doing, in words — the animation carries the feeling, but the
+// state must not be conveyed by motion alone.
+const PET_CAPTIONS: Record<string, string> = {
+  focusing:    "is focusing with you",
+  dozing:      "is dozing while you're paused",
+  celebrating: "is proud of you",
+  deflated:    "is a little disappointed",
+  happy:       "is happy",
+  neutral:     "is waiting",
+  lonely:      "has missed you",
+};
 
 const MAX_COUNTDOWN_MINS  = 120;
 const PLANT_INTERVAL_MINS = 25;
@@ -202,7 +217,7 @@ function formatTime(secs: number) {
 export default function FocusSession() {
   const location = useLocation();
   const navSubjectId = (location.state as { subjectId?: string } | null)?.subjectId ?? "";
-  const { subjects, refreshData }   = useUser();
+  const { subjects, refreshData, user, stats } = useUser();
   const { equipped }                = useInventory();
   const focusBg                     = equipped.focus_bg;
   const { toast }                   = useToast();
@@ -248,6 +263,17 @@ export default function FocusSession() {
   const [showSoundPicker, setShowSoundPicker] = useState(false);
 
   const { sound, volume, isPlaying, setSound, setVolume, SOUND_META } = useAmbientSound();
+
+  // The companion sits under the timer, never beside it: it is here to make the
+  // session feel accompanied, and a pet that competes with the countdown for
+  // attention is working against the screen's only job.
+  const petUnlocked = stats?.petUnlocked ?? false;
+  const activePet   = getPetById(user?.selectedPetId ?? "mochi");
+  const petState    = usePetState({
+    moodKey: stats?.petMood,
+    sessionState: session?.state ?? null,
+    override: done ? (aborted ? "deflated" : "celebrating") : null,
+  }).state;
   const { message: motivationMessage, refetch: refetchMotivation } = useMotivationMessage();
 
   // Sync local defaults from active session (on page enter)
@@ -687,6 +713,21 @@ export default function FocusSession() {
               </button>
             )}
           </div>
+
+          {petUnlocked && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <PetArt
+                petId={activePet.id}
+                state={petState}
+                accentColor={activePet.accentColor}
+                className="w-12 h-12 shrink-0"
+                label={`${activePet.name}, ${PET_CAPTIONS[petState]}`}
+              />
+              <p className="text-[11px] leading-tight">
+                {activePet.name} {PET_CAPTIONS[petState]}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* ── DONE STATE: Pause stats ─────────────────────────────────────── */}

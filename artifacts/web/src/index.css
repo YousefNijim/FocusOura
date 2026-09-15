@@ -282,3 +282,31 @@ nav.fixed.bottom-0 {
   --shelf-edge:  #332519;
   --shelf-shadow:#0C0A07;
 }
+
+/* ── Study pet ─────────────────────────────────────────────────────────────
+   The companion is drawn once and coloured from here, for the same reason the
+   plants are: a fixed fur colour that reads warm on the cream background turns
+   into a glowing blob at night. Each pet's own colour arrives as a prop and
+   lands on the collar and tail tip only — the rig itself stays neutral so the
+   five of them read as one family. */
+:root {
+  --pet-fur:       #C9A27E;
+  --pet-fur-lt:    #E4C9AC;
+  --pet-ear-inner: #E7A8A0;
+  --pet-blush:     #E79B93;
+  --pet-nose:      #6B4A3A;
+  --pet-eye:       #2F2A26;
+  --pet-eye-glint: #FFFFFF;
+  --pet-shadow:    #2A3A31;
+}
+
+.dark {
+  --pet-fur:       #A07C5C;
+  --pet-fur-lt:    #BE9B77;
+  --pet-ear-inner: #A76B66;
+  --pet-blush:     #A96B65;
+  --pet-nose:      #4A3226;
+  --pet-eye:       #16130F;
+  --pet-eye-glint: #E8DFD2;
+  --pet-shadow:    #000000;
+}
