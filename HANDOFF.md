@@ -5,10 +5,52 @@ secret; credentials are referred to by variable name only.
 
 ---
 
-## Next session: start here, in this order
+## Done on 2026-09-15
 
-The work below is agreed and sequenced. Do it top to bottom — the order is not
-cosmetic; each step depends on the one above it.
+Steps 1-3 below are **complete**. Kept for the reasoning, not as a to-do.
+
+| Step | Outcome |
+|---|---|
+| Merge #14-#17 | All four squashed onto master: `01b9ae9`, `6c6d485`, `3638ebf`, `fd8a2ce`. Branches deleted. Typecheck at baseline (7 web / 24 api). |
+| Migrations 006/007/008 | Applied through the Postgres Console. Verified: `challenges.end_time`, `plants.blooms`, `subjects.archived` all present. |
+| APK rebuild | **Not needed** — see the correction under step 3. |
+| Emulator check | Arena loads (it was dead before 006). Garden shows shelves, `arabic Lv 1`, and the de-orphaned `General withered`. The pet is **locked on this account** at 0/5 fully grown, so it has still never been seen on a real screen. |
+
+Two traps worth remembering from this pass:
+
+- **Never `gh pr merge --delete-branch` inside a stack.** Deleting #14's branch
+  auto-closed #15, because GitHub closes any PR whose base branch disappears.
+  Recovering it meant pushing the commit back to re-create the branch, reopening
+  the PR, and retargeting it. Merge without deleting; delete at the end.
+- **Squashing a stack makes every child conflict.** Master gets one squashed
+  commit, the child still has the originals. All three conflicts here were a
+  single import block; resolve by keeping the child's side and re-running
+  typecheck.
+- `grep -c error` over `tsc` output **overcounts**: TypeScript error messages
+  span many lines. Count `grep -cE "^src/.*error TS"` instead. This briefly made
+  the API look like it had 50 errors against a baseline of 24.
+
+---
+
+## Still open
+
+### 1. See the pet on a real screen
+
+Still not done. The account on the emulator has 0 of 5 fully grown plants, so
+the dashboard and garden both render the locked card. The pet is verified only
+as an isolated component — five species, seven states, both themes, at
+72/140/180px. Either grow five plants, or decide the unlock threshold question
+below.
+
+### 2. `Focused Time - 0 min`
+
+Home says "1 sessions completed" while the garden's week view says 0 min. That
+may be honest — the session may fall outside Sep 13-19 — but it is the same
+symptom flagged in the QA sweep and it has not actually been chased down.
+
+---
+
+## The plan as originally written (steps 1-3 are done)
 
 ### 1. Merge the four stacked PRs, oldest base first
 
@@ -42,15 +84,25 @@ There is no migration runner. Paste each file into the Postgres **Console** tab
 
 ```sql
 SELECT table_name, column_name FROM information_schema.columns
-WHERE table_name IN ('challenges','plants','subjects')
-  AND column_name IN ('end_time','blooms','archived_at');
+WHERE (table_name='challenges' AND column_name='end_time')
+   OR (table_name='plants'     AND column_name='blooms')
+   OR (table_name='subjects'   AND column_name='archived');
 ```
 
-### 3. Rebuild and reinstall the APK
+Three rows, or something did not run. The subjects column is `archived`
+(boolean), not `archived_at` — an earlier draft of this file had it wrong.
 
-The installed build predates the SVG plants, the garden shelves, and the pet
-entirely. See "Resuming the APK build" below — the folder is already renamed,
-so those steps run as written.
+### 3. Rebuild and reinstall the APK — WRONG, and not needed
+
+This step was written on a false assumption. `artifacts/mobile/App.tsx` is a
+thin WebView over `EXPO_PUBLIC_WEB_URL`; the web UI is **not bundled into the
+APK**. Every web change reaches the installed app as soon as Vercel deploys
+master. Confirmed by fetching the live bundle and finding the new `pet-mochi`
+palette class in it, then relaunching the installed APK and seeing the new
+garden.
+
+Rebuild the APK only for native changes — Expo plugins, permissions,
+notifications, the app icon. None of this batch touched any of those.
 
 ### 4. Then look at the pet on a real screen
 
